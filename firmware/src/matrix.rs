@@ -1,4 +1,4 @@
-use ch32_hal::{self as hal, Peri, gpio::{AnyPin, Pin}, pac::{self, gpio::vals::{Cnf, Mode}, timer::vals::{CcmrInputCcs, FilterValue, Ocm}}, peripherals, time::Hertz, timer::{Channel, CoreInstance, low_level::{CountingMode, OutputCompareMode, Timer}}};
+use ch32_hal::{self as hal, Peri, gpio::{AnyPin, Pin}, pac::{self, gpio::vals::{Cnf, Mode}, timer::vals::{CcmrInputCcs, FilterValue, Mms, Ocm}}, peripherals, time::Hertz, timer::{Channel, CoreInstance, low_level::{CountingMode, OutputCompareMode, Timer}}};
 
 // Gamma brightness lookup table <https://victornpb.github.io/gamma-table-generator>
 // gamma = 2.20 steps = 256 range = 0-4095
@@ -172,15 +172,30 @@ impl<'a> Matrix<'a> {
         tim1.set_autoreload_preload(true);
         tim1.set_counting_mode(CountingMode::EdgeAlignedUp);
         tim1.set_moe(true);
-        tim1.set_output_compare_mode(Channel::Ch1, OutputCompareMode::PwmMode1);
-        tim1.set_output_compare_mode(Channel::Ch2, OutputCompareMode::PwmMode1);
-        tim1.set_output_compare_mode(Channel::Ch4, OutputCompareMode::PwmMode1);
+        tim1.set_output_compare_mode(Channel::Ch1, OutputCompareMode::PwmMode2);
+        tim1.set_output_compare_mode(Channel::Ch2, OutputCompareMode::PwmMode2);
+        tim1.set_output_compare_mode(Channel::Ch4, OutputCompareMode::PwmMode2);
 
         tim2.set_frequency(Hertz::khz(10));
         tim2.set_autoreload_preload(true);
         tim2.set_counting_mode(CountingMode::EdgeAlignedUp);
+        // Enable outputs/capture on falling edge
+        tim2.regs_gp16().ccer().write(|w| {
+            w.set_cce(0, true);
+            w.set_ccp(0, true);
+            w.set_cce(1, true);
+            w.set_ccp(1, true);
+            w.set_cce(2, true);
+            w.set_ccp(2, true);
+            w.set_cce(3, true);
+            w.set_ccp(3, true);
+        });
 
+        // Configure tim2 as slave of tim1
+        tim1.regs_gp16().ctlr2().modify(|w| w.set_mms(Mms::ENABLE));
+        tim2.regs_gp16().smcfgr().modify(|w| w.set_sms(0b101));
         tim2.start();
+
         tim1.start();
 
         Self { led, btn, tim1, tim2, row: 8, next_group: AltGroup::PosIn }
@@ -242,17 +257,6 @@ impl<'a> Matrix<'a> {
                 // TIM2: Select alternate mapping with button pins
                 pac::AFIO.pcfr1().modify(|w| w.set_tim2_rm(0));
 
-                // TIM2: Enable falling edge input capturing
-                self.tim2.regs_gp16().ccer().write(|w| { // TODO: Move to init
-                    w.set_cce(0, true);
-                    w.set_ccp(0, true);
-                    w.set_cce(1, true);
-                    w.set_ccp(1, true);
-                    w.set_cce(2, true);
-                    w.set_ccp(2, true);
-                    w.set_cce(3, true);
-                    w.set_ccp(3, true);
-                });
                 // TIM2: Configure input capturing filter and input
                 self.tim2.regs_gp16().chctlr_input(0).write(|w| {
                     w.set_ccs(0, CcmrInputCcs::TI4);
@@ -289,25 +293,15 @@ impl<'a> Matrix<'a> {
                     w.set_ccne(1, true);
                     w.set_ccnp(1, true);
                 });
-                // TIM2: Enable outputs
-                self.tim2.regs_gp16().ccer().write(|w| { // TODO: Move to init
-                    w.set_cce(0, true);
-                    w.set_ccp(0, true);
-                    w.set_cce(1, true);
-                    w.set_ccp(1, true);
-                    w.set_cce(2, true);
-                    w.set_ccp(2, true);
-                    w.set_cce(3, true);
-                    w.set_ccp(3, true);
-                });
+
                 // TIM2: Configure output compare mode
                 self.tim2.regs_gp16().chctlr_output(0).write(|w| {
-                    w.set_ocm(0, Ocm::PWMMODE1);
-                    w.set_ocm(1, Ocm::PWMMODE1);
+                    w.set_ocm(0, Ocm::PWMMODE2);
+                    w.set_ocm(1, Ocm::PWMMODE2);
                 });
                 self.tim2.regs_gp16().chctlr_output(1).write(|w| {
-                    w.set_ocm(0, Ocm::PWMMODE1);
-                    w.set_ocm(1, Ocm::PWMMODE1);
+                    w.set_ocm(0, Ocm::PWMMODE2);
+                    w.set_ocm(1, Ocm::PWMMODE2);
                 });
 
                 // Set pwm values
@@ -372,7 +366,7 @@ impl<'a> Matrix<'a> {
         }
     }
 
-    fn get_val(&self, row: usize, col: usize) -> u16 {
-        GAMMA_LUT[MATRIX_DATA[row][if col <= row { col } else { col - 1 }] as usize]
+    fn get_val(&self, row: usize, col: usize) -> u32 {
+        self.tim1.get_max_compare_value() + 1 - (GAMMA_LUT[MATRIX_DATA[row][if col <= row { col } else { col - 1 }] as usize] as u32)
     }
 }
