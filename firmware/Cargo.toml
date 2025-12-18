@@ -1,0 +1,35 @@
+[package]
+name = "fsei-xmas-card-25"
+version = "0.1.0"
+authors = ["Lukas Fink <lukas.fink1@gmail.com>"]
+edition = "2024"
+license = "MIT OR Apache-2.0"
+
+[[bin]]
+name = "fsei-xmas-card-25"
+harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
+
+[dependencies]
+ch32-hal = { git = "https://github.com/ch32-rs/ch32-hal.git", default-features = false, features = [
+    "ch32v003f4u6",
+    "rt",
+    "memory-x",
+] }
+
+qingke-rt = "0.6.1"
+qingke = "0.6.1"
+embedded-hal = "1.0.0"
+panic-halt = "1.0.0"
+
+[profile.dev]
+opt-level = 's'
+
+[profile.release]
+strip = false     # symbols are not flashed to the microcontroller, so don't strip them.
+codegen-units = 1 # LLVM can perform better optimizations using a single thread
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 's'
+overflow-checks = false
