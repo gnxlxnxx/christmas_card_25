@@ -24,7 +24,7 @@ const GAMMA_LUT: [u16; 256] = [
     3584,3617,3650,3683,3716,3750,3784,3818,3852,3886,3920,3955,3990,4025,4060,4095,
 ];
 
-const BLA: [[u8; 8]; 9] = [
+const FB_EXAMPLE: [[u8; 8]; 9] = [
     [32, 0, 0, 0, 0, 0, 0, 0],
     [0, 32, 0, 0, 0, 0, 0, 0],
     [0, 0, 32, 0, 0, 0, 0, 0],
@@ -33,12 +33,39 @@ const BLA: [[u8; 8]; 9] = [
     [0, 0, 0, 0, 0, 32, 0, 0],
     [0, 0, 0, 0, 0, 0, 32, 0],
     [0, 0, 0, 0, 0, 0, 0, 32],
-    [32, 0, 0, 0, 64, 0, 0, 0],
+    [0, 0, 0, 0, 64, 0, 0, 0],
 ];
 
-// static MATRIX_DATA: [[AtomicU8; 8]; 9] = unsafe { mem::transmute([[0u8; 8]; 9]) };
-static MATRIX_FB: [[AtomicU8; 8]; 9] = unsafe { mem::transmute(BLA) };
-static mut MATRIX_INTERNAL: Option<MatrixInternal> = None;
+static MATRIX_FB: MatrixFb = MatrixFb::from_u8_array(FB_EXAMPLE);
+static mut MATRIX_INT: Option<MatrixInterrupt> = None;
+
+#[derive(Debug)]
+pub struct MatrixFb(pub [[AtomicU8; Self::WIDTH]; Self::HEIGHT]);
+
+impl MatrixFb {
+    const WIDTH: usize = 8;
+    const HEIGHT: usize = 9;
+
+    pub const fn new() -> Self {
+        Self::new_filled(0)
+    }
+
+    pub const fn new_filled(val: u8) -> Self {
+        Self::from_u8_array([[val; Self::WIDTH]; Self::HEIGHT])
+    }
+
+    pub const fn from_u8_array(arr: [[u8; Self::WIDTH]; Self::HEIGHT]) -> Self {
+        Self(unsafe { mem::transmute(arr) })
+    }
+
+    pub fn load(&self, x: usize, y: usize) -> u8 {
+        self.0[y][x].load(Ordering::Relaxed)
+    }
+
+    pub fn store(&self, x: usize, y: usize, val: u8) {
+        self.0[y][x].store(val, Ordering::Relaxed)
+    }
+}
 
 pub struct LedPins<'a> ([Peri<'a, AnyPin>; 9]);
 
@@ -54,6 +81,7 @@ impl<'a> LedPins<'a> {
         led8: Peri<'a, peripherals::PC4>,
         led9: Peri<'a, peripherals::PC1>
     ) -> Self {
+        // Set all pins high
         pac::GPIOA.bshr().write(|w| {
             w.set_bs(1, true);
             w.set_bs(2, true);
@@ -83,7 +111,7 @@ impl<'a> LedPins<'a> {
         ])
     }
 
-    fn float_all(&mut self) {
+    fn set_float_all(&mut self) {
         pac::GPIOA.cfglr().modify(|w| {
             w.set_mode(1, Mode::INPUT);
             w.set_cnf(1, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
@@ -119,6 +147,7 @@ impl<'a> LedPins<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct ButtonPins<'a> {
     start: Peri<'a, peripherals::PD7>,
     select: Peri<'a, peripherals::PD4>,
@@ -134,6 +163,28 @@ impl<'a> ButtonPins<'a> {
         r: Peri<'a, peripherals::PD3>
     ) -> Self {
         Self { start, select, l, r }
+    }
+
+    fn set_high_all(&mut self) {
+        pac::GPIOC.bshr().write(|w| {
+            w.set_bs(0, true);
+        });
+        pac::GPIOD.bshr().write(|w| {
+            w.set_bs(3, true);
+            w.set_bs(4, true);
+            w.set_bs(7, true);
+        });
+    }
+
+    fn set_low_all(&mut self) {
+        pac::GPIOC.bshr().write(|w| {
+            w.set_br(0, true);
+        });
+        pac::GPIOD.bshr().write(|w| {
+            w.set_br(3, true);
+            w.set_br(4, true);
+            w.set_br(7, true);
+        });
     }
 }
 
@@ -190,7 +241,7 @@ enum ButtonMeasurement {
     Measurements(ButtonArray<u16>)
 }
 
-struct MatrixInternal {
+struct MatrixInterrupt {
     led: LedPins<'static>,
     btn: ButtonPins<'static>,
     tim1: Timer<'static, peripherals::TIM1>,
@@ -202,13 +253,12 @@ struct MatrixInternal {
     next_group: AltGroup
 }
 
-impl MatrixInternal {
+impl MatrixInterrupt {
     fn get_val(&self, row: usize, col: usize) -> u32 {
         let x = if col <= row { col } else { col - 1 };
         let y = row;
-        let val = MATRIX_FB[y][x].load(Ordering::Relaxed);
 
-        self.cycles - (GAMMA_LUT[val as usize] as u32)
+        self.cycles - (GAMMA_LUT[MATRIX_FB.load(x, y) as usize] as u32)
     }
 
     fn advance_group(&mut self) -> ButtonMeasurement {
@@ -274,19 +324,23 @@ impl MatrixInternal {
                     w.set_icf(1, FilterValue::FCK_INT_N4);
                 });
 
-                // TIM2: Set pulldown on button pins
-                pac::GPIOC.bshr().write(|w| {
-                    w.set_br(0, true);
-                });
-                pac::GPIOD.bshr().write(|w| {
-                    w.set_br(3, true);
-                    w.set_br(4, true);
-                    w.set_br(7, true);
+                // TIM2: Clear capture flags
+                self.tim2.regs_gp16().intfr().modify(|w| {
+                    w.set_ccif(0, false);
+                    w.set_ccif(1, false);
+                    w.set_ccif(2, false);
+                    w.set_ccif(3, false);
                 });
 
-                ButtonMeasurement::StartTime(self.tim1.regs_basic().cnt().read())
+                // TIM2: Set pulldown on button pins
+                self.btn.set_low_all();
+
+                MATRIX_FB.store(0, 8, if pac::GPIOD.indr().read().idr(4) { 32 } else { 0 });
+
+                ButtonMeasurement::StartTime(self.tim2.regs_basic().cnt().read())
             },
             AltGroup::NegOut => {
+                MATRIX_FB.store(1, 8 ,if pac::GPIOD.indr().read().idr(4) { 32 } else { 0 });
                 self.next_group = AltGroup::PosIn;
 
                 let measurement = ButtonArray::new(
@@ -295,15 +349,6 @@ impl MatrixInternal {
                     self.tim2.get_capture_value(Channel::Ch3) as u16,
                     self.tim2.get_capture_value(Channel::Ch2) as u16
                 );
-                // TIM2: Clear capture flags
-                self.tim2.regs_gp16().intfr().modify(|w| {
-                    w.set_ccif(0, false);
-                    w.set_ccif(1, false);
-                    w.set_ccif(2, false);
-                    w.set_ccif(3, false);
-                });
-                // let measurement = ButtonArray::new(0, 0, 0, 0);
-                // Delay.delay_us(1);
 
                 // TIM1: Enable outputs
                 self.tim1.regs_gp16().ccer().write(|w| {
@@ -332,6 +377,8 @@ impl MatrixInternal {
                 self.tim2.set_compare_value(Channel::Ch2, self.get_val(self.row, 6).into());
                 self.tim2.set_compare_value(Channel::Ch3, self.get_val(self.row, 3).into());
                 self.tim2.set_compare_value(Channel::Ch4, self.get_val(self.row, 4).into());
+
+                self.btn.set_high_all();
 
                 // TIM1: Attach negative led pins
                 // TIM2: Attach led pins
@@ -368,35 +415,25 @@ impl MatrixInternal {
                 // TIM2: Select alternate mapping with leds
                 pac::AFIO.pcfr1().modify(|w| w.set_tim2_rm(3));
 
-                // Set button pins high
-                pac::GPIOC.bshr().write(|w| {
-                    w.set_bs(0, true);
-                });
-                pac::GPIOD.bshr().write(|w| {
-                    w.set_bs(3, true);
-                    w.set_bs(4, true);
-                    w.set_bs(7, true);
-                });
-
                 ButtonMeasurement::Measurements(measurement)
             }
         }
     }
 
     fn advance(&mut self) {
-        self.led.float_all();
+        self.led.set_float_all();
 
         let measurement = self.advance_group();
 
         self.led.set_high(self.row);
 
-        if let ButtonMeasurement::Measurements(measurement) = measurement {
-            let mut val = *measurement.start();
-            // let mut val = self.cycles as u16;
-            // let mut val = self.tim1.regs_basic().psc().read();
+        if let ButtonMeasurement::Measurements(measurement) = measurement && self.row == 5 {
+            let mut val = *measurement.select();
+        // if let ButtonMeasurement::StartTime(time) = measurement {
+        //     let mut val = time;
 
             for i in 0..16 {
-                MATRIX_FB[i / 8][i % 8].store(if val & 1 != 0 { 16 } else { 0 }, Ordering::Relaxed);
+                MATRIX_FB.store(i%8, i/8, if val&1 != 0 { 32 } else { 0 });
                 val >>= 1;
             }
         }
@@ -405,16 +442,17 @@ impl MatrixInternal {
 
 #[interrupt]
 fn TIM1_UP() {
-    let matrix_internal = unsafe {
-        (&mut *&raw mut MATRIX_INTERNAL).as_mut().unwrap_unchecked()
+    let matrix_int = unsafe {
+        (&mut *&raw mut MATRIX_INT).as_mut().unwrap_unchecked()
     };
 
-    if matrix_internal.tim1.clear_update_interrupt() {
-        matrix_internal.advance();
+    if matrix_int.tim1.clear_update_interrupt() {
+        matrix_int.advance();
     }
 }
 
 pub struct Matrix {
+    fb: &'static MatrixFb
 }
 
 impl Matrix {
@@ -458,6 +496,9 @@ impl Matrix {
             w.set_ccp(3, true);
         });
 
+        // Set capture register to -1 on counter overflow
+        // tim2.regs_gp16().ctlr1().modify(|w| w.set_capov(true));
+
         // Configure tim2 as slave of tim1 (tim1 enable also controls tim2)
         tim1.regs_gp16().ctlr2().modify(|w| w.set_mms(Mms::ENABLE));
         tim2.regs_gp16().smcfgr().modify(|w| w.set_sms(0b101));
@@ -466,9 +507,10 @@ impl Matrix {
         tim1.start();
 
         let cycles = tim1.get_max_compare_value() + 1;
+        assert!(cycles >= GAMMA_LUT[255] as u32);
 
         unsafe {
-            MATRIX_INTERNAL = Some(MatrixInternal {
+            MATRIX_INT = Some(MatrixInterrupt {
                 led,
                 btn,
                 tim1,
@@ -481,6 +523,10 @@ impl Matrix {
             hal::interrupt::TIM1_UP.enable();
         }
 
-        Self {}
+        Self { fb: &MATRIX_FB }
+    }
+
+    pub fn fb(&self) -> &MatrixFb {
+        self.fb
     }
 }
