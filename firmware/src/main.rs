@@ -5,14 +5,17 @@
 pub mod matrix;
 
 use panic_halt as _;
-use ch32_hal::{self as hal, pac, delay::Delay, gpio::{Level, Output, OutputOpenDrain}, pac::gpio::vals::{Cnf, Mode}, timer::{Channel, low_level::{CountingMode, OutputCompareMode}}};
+use ch32_hal::{self as hal, delay::Delay, gpio::{Level, Output, OutputOpenDrain}, pac::{self, gpio::vals::{Cnf, Mode}, rcc::vals::{Hpre, Pllsrc, Ppre, Sw}}, timer::{Channel, low_level::{CountingMode, OutputCompareMode}}};
 
 use crate::matrix::{ButtonPins, LedPins, Matrix};
 
 #[qingke_rt::entry]
 fn main() -> ! {
     hal::debug::SDIPrint::enable();
-    let p = hal::init(hal::Config::default());
+    let p = hal::init(hal::Config {
+        rcc: hal::rcc::Config::SYSCLK_FREQ_48MHZ_HSI,
+        dma_interrupt_priority: qingke::interrupt::Priority::P0
+    });
     let mut delay = Delay;
     let led = LedPins::new(p.PD0, p.PA2, p.PA1, p.PD6, p.PD5, p.PD2, p.PC7, p.PC4, p.PC1);
     let btn = ButtonPins::new(p.PD7, p.PD4, p.PC0, p.PD3);
@@ -79,7 +82,6 @@ fn main() -> ! {
     // Adjust the LED GPIO according to your board
     // let mut led2 = OutputOpenDrain::new(p.PA2, Level::Low, Default::default());
     loop {
-        matrix.advance();
         // led2.toggle();
         delay.delay_ms(1);
         hal::println!("toggle!");

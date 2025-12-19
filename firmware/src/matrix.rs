@@ -1,4 +1,7 @@
-use ch32_hal::{self as hal, Peri, gpio::{AnyPin, Pin}, pac::{self, gpio::vals::{Cnf, Mode}, timer::vals::{CcmrInputCcs, FilterValue, Mms, Ocm}}, peripherals, time::Hertz, timer::{Channel, CoreInstance, low_level::{CountingMode, OutputCompareMode, Timer}}};
+use core::{any::Any, arch::asm, mem, sync::atomic::{AtomicU8, Ordering}, u16};
+
+use ch32_hal::{self as hal, Peri, delay::Delay, gpio::{AnyPin, Pin}, interrupt::InterruptExt, pac::{self, gpio::vals::{Cnf, Mode}, timer::vals::{CcmrInputCcs, FilterValue, Mms, Ocm, Urs}}, peripherals, time::Hertz, timer::{Channel, CoreInstance, low_level::{CountingMode, OutputCompareMode, Timer}}};
+use crate::hal::interrupt;
 
 // Gamma brightness lookup table <https://victornpb.github.io/gamma-table-generator>
 // gamma = 2.20 steps = 256 range = 0-4095
@@ -21,19 +24,7 @@ const GAMMA_LUT: [u16; 256] = [
     3584,3617,3650,3683,3716,3750,3784,3818,3852,3886,3920,3955,3990,4025,4060,4095,
 ];
 
-// const MATRIX_DATA: [[u8; 8]; 9] = [
-//     [0, 8, 16, 32, 64, 128, 255, 16],
-//     [32, 0, 0 ,0, 64, 0, 0, 16],
-//     [0, 8, 16, 32, 64, 128, 255, 16],
-//     [32, 0, 0 ,0, 64, 0, 0, 16],
-//     [0, 8, 16, 32, 64, 128, 255, 16],
-//     [32, 0, 0 ,0, 64, 0, 0, 16],
-//     [0, 8, 16, 32, 64, 128, 255, 16],
-//     [32, 0, 0 ,0, 64, 0, 0, 16],
-//     [32, 0, 0 ,0, 64, 0, 0, 16]
-// ];
-//
-const MATRIX_DATA: [[u8; 8]; 9] = [
+const BLA: [[u8; 8]; 9] = [
     [32, 0, 0, 0, 0, 0, 0, 0],
     [0, 32, 0, 0, 0, 0, 0, 0],
     [0, 0, 32, 0, 0, 0, 0, 0],
@@ -45,10 +36,9 @@ const MATRIX_DATA: [[u8; 8]; 9] = [
     [32, 0, 0, 0, 64, 0, 0, 0],
 ];
 
-enum AltGroup {
-    PosIn,
-    NegOut
-}
+// static MATRIX_DATA: [[AtomicU8; 8]; 9] = unsafe { mem::transmute([[0u8; 8]; 9]) };
+static MATRIX_FB: [[AtomicU8; 8]; 9] = unsafe { mem::transmute(BLA) };
+static mut MATRIX_INTERNAL: Option<MatrixInternal> = None;
 
 pub struct LedPins<'a> ([Peri<'a, AnyPin>; 9]);
 
@@ -93,7 +83,7 @@ impl<'a> LedPins<'a> {
         ])
     }
 
-    fn float_all(&self) {
+    fn float_all(&mut self) {
         pac::GPIOA.cfglr().modify(|w| {
             w.set_mode(1, Mode::INPUT);
             w.set_cnf(1, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
@@ -120,7 +110,7 @@ impl<'a> LedPins<'a> {
         });
     }
 
-    fn set_high(&self, row: usize) {
+    fn set_high(&mut self, row: usize) {
         let pin = &self.0[row];
         pac::GPIO(pin.port().into()).cfglr().modify(|w| {
             w.set_mode(pin.pin().into(), Mode::OUTPUT_50MHZ);
@@ -147,72 +137,85 @@ impl<'a> ButtonPins<'a> {
     }
 }
 
-pub struct Matrix<'a> {
-    led: LedPins<'a>,
-    btn: ButtonPins<'a>,
-    tim1: Timer<'a, peripherals::TIM1>,
-    tim2: Timer<'a, peripherals::TIM2>,
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+enum AltGroup {
+    PosIn,
+    NegOut
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
+struct ButtonArray<T>([T; 4]);
+
+impl<T> ButtonArray<T> {
+    fn new(start: T, select: T, l: T, r: T) -> Self {
+        ButtonArray([start, select, l, r])
+    }
+
+    fn start(&self) -> &T {
+        &self.0[0]
+    }
+
+    fn select(&self) -> &T {
+        &self.0[1]
+    }
+
+    fn l(&self) -> &T {
+        &self.0[2]
+    }
+
+    fn r(&self) -> &T {
+        &self.0[3]
+    }
+
+    fn set_start(&mut self, val: T) {
+        self.0[0] = val;
+    }
+
+    fn set_select(&mut self, val: T) {
+        self.0[1] = val;
+    }
+
+    fn set_l(&mut self, val: T) {
+        self.0[2] = val;
+    }
+
+    fn set_r(&mut self, val: T) {
+        self.0[3] = val;
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+enum ButtonMeasurement {
+    StartTime(u16),
+    Measurements(ButtonArray<u16>)
+}
+
+struct MatrixInternal {
+    led: LedPins<'static>,
+    btn: ButtonPins<'static>,
+    tim1: Timer<'static, peripherals::TIM1>,
+    tim2: Timer<'static, peripherals::TIM2>,
+
+    cycles: u32,
 
     row: usize,
     next_group: AltGroup
 }
 
-impl<'a> Matrix<'a> {
-    pub fn new(
-        mut led: LedPins<'a>,
-        mut btn: ButtonPins<'a>,
+impl MatrixInternal {
+    fn get_val(&self, row: usize, col: usize) -> u32 {
+        let x = if col <= row { col } else { col - 1 };
+        let y = row;
+        let val = MATRIX_FB[y][x].load(Ordering::Relaxed);
 
-        tim1: Peri<'a, peripherals::TIM1>,
-        tim2: Peri<'a, peripherals::TIM2>
-    ) -> Self {
-        let tim1 = Timer::new(tim1);
-        let tim2 = Timer::new(tim2);
-
-        tim1.set_frequency(Hertz::khz(10));
-        tim1.set_autoreload_preload(true);
-        tim1.set_counting_mode(CountingMode::EdgeAlignedUp);
-        tim1.set_moe(true);
-        tim1.set_output_compare_mode(Channel::Ch1, OutputCompareMode::PwmMode2);
-        tim1.set_output_compare_mode(Channel::Ch2, OutputCompareMode::PwmMode2);
-        tim1.set_output_compare_mode(Channel::Ch4, OutputCompareMode::PwmMode2);
-
-        tim2.set_frequency(Hertz::khz(10));
-        tim2.set_autoreload_preload(true);
-        tim2.set_counting_mode(CountingMode::EdgeAlignedUp);
-        // Enable outputs/capture on falling edge
-        tim2.regs_gp16().ccer().write(|w| {
-            w.set_cce(0, true);
-            w.set_ccp(0, true);
-            w.set_cce(1, true);
-            w.set_ccp(1, true);
-            w.set_cce(2, true);
-            w.set_ccp(2, true);
-            w.set_cce(3, true);
-            w.set_ccp(3, true);
-        });
-
-        // Configure tim2 as slave of tim1
-        tim1.regs_gp16().ctlr2().modify(|w| w.set_mms(Mms::ENABLE));
-        tim2.regs_gp16().smcfgr().modify(|w| w.set_sms(0b101));
-        tim2.start();
-
-        tim1.start();
-
-        Self { led, btn, tim1, tim2, row: 8, next_group: AltGroup::PosIn }
+        self.cycles - (GAMMA_LUT[val as usize] as u32)
     }
 
-    pub fn advance(&mut self) {
-        self.led.float_all();
-
-        self.advance_group();
-
-        self.led.set_high(self.row);
-    }
-
-    fn advance_group(&mut self) -> Option<(u16, u16, u16, u16)> {
+    fn advance_group(&mut self) -> ButtonMeasurement {
         match self.next_group {
             AltGroup::PosIn => {
                 self.row = (self.row + 1) % 9;
+                self.next_group = AltGroup::NegOut;
 
                 // TIM1: Enable outputs
                 self.tim1.regs_gp16().ccer().write(|w| {
@@ -281,11 +284,27 @@ impl<'a> Matrix<'a> {
                     w.set_br(7, true);
                 });
 
-                self.next_group = AltGroup::NegOut;
-
-                None
+                ButtonMeasurement::StartTime(self.tim1.regs_basic().cnt().read())
             },
             AltGroup::NegOut => {
+                self.next_group = AltGroup::PosIn;
+
+                let measurement = ButtonArray::new(
+                    self.tim2.get_capture_value(Channel::Ch4) as u16,
+                    self.tim2.get_capture_value(Channel::Ch1) as u16,
+                    self.tim2.get_capture_value(Channel::Ch3) as u16,
+                    self.tim2.get_capture_value(Channel::Ch2) as u16
+                );
+                // TIM2: Clear capture flags
+                self.tim2.regs_gp16().intfr().modify(|w| {
+                    w.set_ccif(0, false);
+                    w.set_ccif(1, false);
+                    w.set_ccif(2, false);
+                    w.set_ccif(3, false);
+                });
+                // let measurement = ButtonArray::new(0, 0, 0, 0);
+                // Delay.delay_us(1);
+
                 // TIM1: Enable outputs
                 self.tim1.regs_gp16().ccer().write(|w| {
                     w.set_ccne(0, true);
@@ -359,14 +378,109 @@ impl<'a> Matrix<'a> {
                     w.set_bs(7, true);
                 });
 
-                self.next_group = AltGroup::PosIn;
-
-                Some((0, 0, 0, 0))
+                ButtonMeasurement::Measurements(measurement)
             }
         }
     }
 
-    fn get_val(&self, row: usize, col: usize) -> u32 {
-        self.tim1.get_max_compare_value() + 1 - (GAMMA_LUT[MATRIX_DATA[row][if col <= row { col } else { col - 1 }] as usize] as u32)
+    fn advance(&mut self) {
+        self.led.float_all();
+
+        let measurement = self.advance_group();
+
+        self.led.set_high(self.row);
+
+        if let ButtonMeasurement::Measurements(measurement) = measurement {
+            let mut val = *measurement.start();
+            // let mut val = self.cycles as u16;
+            // let mut val = self.tim1.regs_basic().psc().read();
+
+            for i in 0..16 {
+                MATRIX_FB[i / 8][i % 8].store(if val & 1 != 0 { 16 } else { 0 }, Ordering::Relaxed);
+                val >>= 1;
+            }
+        }
+    }
+}
+
+#[interrupt]
+fn TIM1_UP() {
+    let matrix_internal = unsafe {
+        (&mut *&raw mut MATRIX_INTERNAL).as_mut().unwrap_unchecked()
+    };
+
+    if matrix_internal.tim1.clear_update_interrupt() {
+        matrix_internal.advance();
+    }
+}
+
+pub struct Matrix {
+}
+
+impl Matrix {
+    pub fn new(
+        led: LedPins<'static>,
+        btn: ButtonPins<'static>,
+
+        tim1: Peri<'static, peripherals::TIM1>,
+        tim2: Peri<'static, peripherals::TIM2>
+    ) -> Self {
+        let tim1 = Timer::new(tim1);
+        let tim2 = Timer::new(tim2);
+
+        tim1.set_frequency(Hertz::khz(10));
+        tim2.set_frequency(Hertz::khz(10));
+
+        tim1.set_autoreload_preload(true);
+        tim2.set_autoreload_preload(true);
+
+        tim1.set_counting_mode(CountingMode::EdgeAlignedUp);
+        tim2.set_counting_mode(CountingMode::EdgeAlignedUp);
+
+        tim1.set_output_compare_mode(Channel::Ch1, OutputCompareMode::PwmMode2);
+        tim1.set_output_compare_mode(Channel::Ch2, OutputCompareMode::PwmMode2);
+        tim1.set_output_compare_mode(Channel::Ch4, OutputCompareMode::PwmMode2);
+        tim1.set_moe(true);
+
+        // Trigger TIM1_UP interrupt on timer overflow
+        tim1.regs_gp16().ctlr1().modify(|w| w.set_urs(Urs::COUNTERONLY));
+        tim1.enable_update_interrupt(true);
+
+        // Enable outputs/capture on falling edge
+        tim2.regs_gp16().ccer().write(|w| {
+            w.set_cce(0, true);
+            w.set_ccp(0, true);
+            w.set_cce(1, true);
+            w.set_ccp(1, true);
+            w.set_cce(2, true);
+            w.set_ccp(2, true);
+            w.set_cce(3, true);
+            w.set_ccp(3, true);
+        });
+
+        // Configure tim2 as slave of tim1 (tim1 enable also controls tim2)
+        tim1.regs_gp16().ctlr2().modify(|w| w.set_mms(Mms::ENABLE));
+        tim2.regs_gp16().smcfgr().modify(|w| w.set_sms(0b101));
+        tim2.start();
+
+        tim1.start();
+
+        let cycles = tim1.get_max_compare_value() + 1;
+
+        unsafe {
+            MATRIX_INTERNAL = Some(MatrixInternal {
+                led,
+                btn,
+                tim1,
+                tim2,
+                cycles,
+                row: 8,
+                next_group: AltGroup::PosIn
+            });
+
+            hal::interrupt::TIM1_UP.enable();
+        }
+
+        Self {}
     }
 }
