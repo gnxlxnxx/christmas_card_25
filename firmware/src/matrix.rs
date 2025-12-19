@@ -198,16 +198,12 @@ enum AltGroup {
 struct ButtonArray<T>([T; 4]);
 
 impl<T> ButtonArray<T> {
-    fn new(start: T, select: T, l: T, r: T) -> Self {
-        ButtonArray([start, select, l, r])
-    }
-
     fn start(&self) -> &T {
-        &self.0[0]
+        &self.0[3]
     }
 
     fn select(&self) -> &T {
-        &self.0[1]
+        &self.0[0]
     }
 
     fn l(&self) -> &T {
@@ -215,15 +211,15 @@ impl<T> ButtonArray<T> {
     }
 
     fn r(&self) -> &T {
-        &self.0[3]
+        &self.0[1]
     }
 
     fn set_start(&mut self, val: T) {
-        self.0[0] = val;
+        self.0[3] = val;
     }
 
     fn set_select(&mut self, val: T) {
-        self.0[1] = val;
+        self.0[0] = val;
     }
 
     fn set_l(&mut self, val: T) {
@@ -231,14 +227,14 @@ impl<T> ButtonArray<T> {
     }
 
     fn set_r(&mut self, val: T) {
-        self.0[3] = val;
+        self.0[1] = val;
     }
 }
 
 #[derive(Eq, PartialEq, Clone, Copy)]
 enum ButtonMeasurement {
     StartTime(u16),
-    Measurements([u16; 4], pac::timer::regs::Intfr)
+    Measurements(ButtonArray<u16>, pac::timer::regs::Intfr)
 }
 
 struct MatrixInterrupt {
@@ -353,16 +349,17 @@ impl MatrixInterrupt {
 
                 ButtonMeasurement::StartTime(self.tim2.regs_basic().cnt().read())
             },
+
             AltGroup::NegOut => {
                 self.next_group = AltGroup::PosIn;
 
                 let intfr = self.tim2.regs_gp16().intfr().read();
-                let measurement = [
+                let measurement = ButtonArray([
                     self.tim2.get_capture_value(Channel::Ch1) as u16,
                     self.tim2.get_capture_value(Channel::Ch2) as u16,
                     self.tim2.get_capture_value(Channel::Ch3) as u16,
                     self.tim2.get_capture_value(Channel::Ch4) as u16
-                ];
+                ]);
 
                 // TIM1: Enable outputs
                 self.tim1.regs_gp16().ccer().write(|w| {
@@ -460,11 +457,11 @@ impl MatrixInterrupt {
 
         self.led.set_high(self.row);
 
-        if let ButtonMeasurement::Measurements(measurement, intfr) = measurement && self.row == 5 {
+        if let ButtonMeasurement::Measurements(measurement, intfr) = measurement {
         // if let ButtonMeasurement::StartTime(time) = measurement {
         //     let mut val = time;
 
-            for (i, val) in measurement.iter().enumerate() {
+            for (i, val) in measurement.0.iter().enumerate() {
                 let mut val = *val;
                 for j in 0..16 {
                     MATRIX_FB.store(j%8, 2*i + j/8, if val&1 != 0 { 32 } else { 0 });
