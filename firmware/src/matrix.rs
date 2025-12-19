@@ -1,6 +1,6 @@
 use core::{any::Any, arch::asm, mem, sync::atomic::{AtomicU8, Ordering}, u16};
 
-use ch32_hal::{self as hal, Peri, delay::Delay, gpio::{AnyPin, Pin}, interrupt::InterruptExt, pac::{self, gpio::vals::{Cnf, Mode}, timer::vals::{CcmrInputCcs, FilterValue, Mms, Ocm, Urs}}, peripherals, time::Hertz, timer::{Channel, CoreInstance, low_level::{CountingMode, OutputCompareMode, Timer}}};
+use ch32_hal::{self as hal, Peri, delay::Delay, gpio::{AnyPin, Pin}, interrupt::InterruptExt, pac::{self, gpio::vals::{Cnf, Mode}, timer::vals::{CcmrInputCcs, CcmrOutputCcs, FilterValue, Mms, Ocm, Urs}}, peripherals, time::Hertz, timer::{Channel, CoreInstance, low_level::{CountingMode, OutputCompareMode, Timer}}};
 use crate::hal::interrupt;
 
 // Gamma brightness lookup table <https://victornpb.github.io/gamma-table-generator>
@@ -235,10 +235,10 @@ impl<T> ButtonArray<T> {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Eq, PartialEq, Clone, Copy)]
 enum ButtonMeasurement {
     StartTime(u16),
-    Measurements(ButtonArray<u16>)
+    Measurements([u16; 4], pac::timer::regs::Intfr)
 }
 
 struct MatrixInterrupt {
@@ -307,6 +307,9 @@ impl MatrixInterrupt {
                     w.set_cnf(7, Cnf::PULL_IN__AF_PUSH_PULL_OUT);
                 });
 
+                // TIM2: Disable all channels to allow changing ccs bits
+                self.tim2.regs_gp16().ccer().write(|w| ());
+
                 // TIM2: Select alternate mapping with button pins
                 pac::AFIO.pcfr1().modify(|w| w.set_tim2_rm(0));
 
@@ -332,23 +335,34 @@ impl MatrixInterrupt {
                     w.set_ccif(3, false);
                 });
 
+                // TIM2: Enable falling edge capture inputs
+                self.tim2.regs_gp16().ccer().write(|w| {
+                    w.set_cce(0, true);
+                    w.set_ccp(0, true);
+                    w.set_cce(1, true);
+                    w.set_ccp(1, true);
+                    w.set_cce(2, true);
+                    w.set_ccp(2, true);
+                    w.set_cce(3, true);
+                    w.set_ccp(3, true);
+                });
+
                 // TIM2: Set pulldown on button pins
                 self.btn.set_low_all();
 
-                MATRIX_FB.store(0, 8, if pac::GPIOD.indr().read().idr(4) { 32 } else { 0 });
 
                 ButtonMeasurement::StartTime(self.tim2.regs_basic().cnt().read())
             },
             AltGroup::NegOut => {
-                MATRIX_FB.store(1, 8 ,if pac::GPIOD.indr().read().idr(4) { 32 } else { 0 });
                 self.next_group = AltGroup::PosIn;
 
-                let measurement = ButtonArray::new(
-                    self.tim2.get_capture_value(Channel::Ch4) as u16,
+                let intfr = self.tim2.regs_gp16().intfr().read();
+                let measurement = [
                     self.tim2.get_capture_value(Channel::Ch1) as u16,
+                    self.tim2.get_capture_value(Channel::Ch2) as u16,
                     self.tim2.get_capture_value(Channel::Ch3) as u16,
-                    self.tim2.get_capture_value(Channel::Ch2) as u16
-                );
+                    self.tim2.get_capture_value(Channel::Ch4) as u16
+                ];
 
                 // TIM1: Enable outputs
                 self.tim1.regs_gp16().ccer().write(|w| {
@@ -358,14 +372,36 @@ impl MatrixInterrupt {
                     w.set_ccnp(1, true);
                 });
 
+                // TIM2: Disable all channels to allow changing ccs bits
+                self.tim2.regs_gp16().ccer().write(|w| ());
+
+                // TIM2: Select alternate mapping with leds
+                pac::AFIO.pcfr1().modify(|w| w.set_tim2_rm(3));
+
                 // TIM2: Configure output compare mode
                 self.tim2.regs_gp16().chctlr_output(0).write(|w| {
+                    w.set_ccs(0, CcmrOutputCcs::OUTPUT);
                     w.set_ocm(0, Ocm::PWMMODE2);
+                    w.set_ccs(1, CcmrOutputCcs::OUTPUT);
                     w.set_ocm(1, Ocm::PWMMODE2);
                 });
                 self.tim2.regs_gp16().chctlr_output(1).write(|w| {
+                    w.set_ccs(0, CcmrOutputCcs::OUTPUT);
                     w.set_ocm(0, Ocm::PWMMODE2);
+                    w.set_ccs(1, CcmrOutputCcs::OUTPUT);
                     w.set_ocm(1, Ocm::PWMMODE2);
+                });
+
+                // TIM2: Enable outputs
+                self.tim2.regs_gp16().ccer().write(|w| {
+                    w.set_cce(0, true);
+                    w.set_ccp(0, true);
+                    w.set_cce(1, true);
+                    w.set_ccp(1, true);
+                    w.set_cce(2, true);
+                    w.set_ccp(2, true);
+                    w.set_cce(3, true);
+                    w.set_ccp(3, true);
                 });
 
                 // Set pwm values
@@ -412,10 +448,7 @@ impl MatrixInterrupt {
                     w.set_cnf(7, Cnf::ANALOG_IN__PUSH_PULL_OUT);
                 });
 
-                // TIM2: Select alternate mapping with leds
-                pac::AFIO.pcfr1().modify(|w| w.set_tim2_rm(3));
-
-                ButtonMeasurement::Measurements(measurement)
+                ButtonMeasurement::Measurements(measurement, intfr)
             }
         }
     }
@@ -427,14 +460,20 @@ impl MatrixInterrupt {
 
         self.led.set_high(self.row);
 
-        if let ButtonMeasurement::Measurements(measurement) = measurement && self.row == 5 {
-            let mut val = *measurement.select();
+        if let ButtonMeasurement::Measurements(measurement, intfr) = measurement && self.row == 5 {
         // if let ButtonMeasurement::StartTime(time) = measurement {
         //     let mut val = time;
 
-            for i in 0..16 {
-                MATRIX_FB.store(i%8, i/8, if val&1 != 0 { 32 } else { 0 });
-                val >>= 1;
+            for (i, val) in measurement.iter().enumerate() {
+                let mut val = *val;
+                for j in 0..16 {
+                    MATRIX_FB.store(j%8, 2*i + j/8, if val&1 != 0 { 32 } else { 0 });
+                    val >>= 1;
+                }
+            }
+
+            for i in 0..4 {
+                MATRIX_FB.store(i, 8, if intfr.ccif(i) { 32 } else { 0 });
             }
         }
     }
@@ -468,6 +507,7 @@ impl Matrix {
 
         tim1.set_frequency(Hertz::khz(10));
         tim2.set_frequency(Hertz::khz(10));
+        assert_eq!(tim1.get_max_compare_value(), tim2.get_max_compare_value());
 
         tim1.set_autoreload_preload(true);
         tim2.set_autoreload_preload(true);
@@ -483,18 +523,6 @@ impl Matrix {
         // Trigger TIM1_UP interrupt on timer overflow
         tim1.regs_gp16().ctlr1().modify(|w| w.set_urs(Urs::COUNTERONLY));
         tim1.enable_update_interrupt(true);
-
-        // Enable outputs/capture on falling edge
-        tim2.regs_gp16().ccer().write(|w| {
-            w.set_cce(0, true);
-            w.set_ccp(0, true);
-            w.set_cce(1, true);
-            w.set_ccp(1, true);
-            w.set_cce(2, true);
-            w.set_ccp(2, true);
-            w.set_cce(3, true);
-            w.set_ccp(3, true);
-        });
 
         // Set capture register to -1 on counter overflow
         // tim2.regs_gp16().ctlr1().modify(|w| w.set_capov(true));
