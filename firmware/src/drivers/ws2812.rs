@@ -1,9 +1,6 @@
 use ch32_hal as hal;
-use core::mem;
-use embedded_hal::spi::SpiBus;
-use hal::spi::{Config, Instance, Spi, TxDma};
+use hal::spi::{Config, Spi};
 use hal::{Peri, peripherals};
-use hal::{dma, dma::Channel};
 
 const BITQUARTETS: [u16; 16] = [
     0b1000100010001000,
@@ -36,25 +33,22 @@ impl Color {
         Self { r, g, b }
     }
 
-    fn to_slices_grb(&self) -> [u16; 6] {
-        let mut result: [u16; 6] = [0; 6];
+    fn to_slices_grb(&self, result: &mut [u16; 6]) {
         result[0] = BITQUARTETS[(self.g >> 4) as usize];
         result[1] = BITQUARTETS[(self.g & 0xF) as usize];
         result[2] = BITQUARTETS[(self.r >> 4) as usize];
         result[3] = BITQUARTETS[(self.r & 0xF) as usize];
         result[4] = BITQUARTETS[(self.b >> 4) as usize];
         result[5] = BITQUARTETS[(self.b & 0xF) as usize];
-        result
     }
 }
 
 pub struct Ws2812<'a> {
     spi: Spi<'a, peripherals::SPI1, ch32_hal::mode::Async>,
-    // spi: Spi<'a, peripherals::SPI1, ch32_hal::mode::Blocking>,
 }
 
 impl<'a> Ws2812<'a> {
-    pub fn init(
+    pub fn new(
         pin: Peri<'static, peripherals::PC6>,
         spi1: Peri<'static, peripherals::SPI1>,
         dma1_ch3: Peri<'static, peripherals::DMA1_CH3>,
@@ -64,41 +58,21 @@ impl<'a> Ws2812<'a> {
 
         spi_config.frequency = hal::prelude::Hertz::hz(3_000_000);
 
-        let mut spi = Spi::new_txonly_nosck::<0>(spi1, pin, dma1_ch3, spi_config);
-        // let mut spi = Spi::new_blocking_txonly_nosck::<0>(spi1, pin, spi_config);
-
-        // TODO: The C impl has this but this is for reading, do I really need this here?
-        //        hal::pac::SPI1.hscr().write(|w| w.set_hsrxen(true));
-
-        // let mut foo = [0; 36];
-
-        // foo[12..18].clone_from_slice(&Color::new(0, 0, 0).to_slices_grb());
-        // foo[18..24].clone_from_slice(&Color::new(0, 0, 0).to_slices_grb());
-        // foo[24..30].clone_from_slice(&Color::new(0, 0, 0).to_slices_grb());
-
-        // spi.write::<u16>(&foo).await;
+        let spi = Spi::new_txonly_nosck::<0>(spi1, pin, dma1_ch3, spi_config);
 
         Self { spi }
     }
 
-    pub async fn start(&mut self, colors: [Color; 6]) {
-        // let color1 = Color::new(0x08, 0, 0).to_slices_grb();
-        // let color2 = Color::new(0, 0x08, 0).to_slices_grb();
-        // let color3 = Color::new(0, 0, 0x08).to_slices_grb();
+    pub async fn start(&mut self, colors: &[Color; 6]) {
 
         // I have 2 leading and one trailing led full of '0's
-        let mut foo = [0; (6 + 3) * 6];
+        let mut buf = [[0u16; 6]; 6 + 3];
 
-        foo[12..18].clone_from_slice(&colors[0].to_slices_grb());
-        foo[18..24].clone_from_slice(&colors[1].to_slices_grb());
-        foo[24..30].clone_from_slice(&colors[2].to_slices_grb());
-        foo[30..36].clone_from_slice(&colors[3].to_slices_grb());
-        foo[36..42].clone_from_slice(&colors[4].to_slices_grb());
-        foo[42..48].clone_from_slice(&colors[5].to_slices_grb());
+        for (i, led) in (&mut buf[2..8]).into_iter().enumerate() {
+            colors[i].to_slices_grb(led);
+        }
 
-        self.spi.write::<u16>(&foo).await.unwrap(); // surely this unwrap will never fail ...
-        // TODO: I don't know why yet, but the first led doesn't get set the very first time
-        self.spi.write::<u16>(&foo).await.unwrap(); // surely this unwrap will never fail ...
+        self.spi.write::<u16>(&buf.as_flattened()).await.unwrap(); // surely this unwrap will never fail ...
     }
 }
 

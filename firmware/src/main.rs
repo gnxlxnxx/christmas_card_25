@@ -3,7 +3,6 @@
 #![feature(type_alias_impl_trait)]
 
 pub mod drivers;
-pub mod ws2812;
 
 use embassy_time::Timer;
 use panic_halt as _;
@@ -12,7 +11,7 @@ use ch32_hal::{self as hal};
 
 use drivers::{matrix::{self, Matrix}, buttons::{self, Buttons}};
 
-use crate::ws2812::{Color, HUETABLE, RANDS, SINTABLE};
+use drivers::ws2812::{Color, HUETABLE, RANDS, SINTABLE};
 
 #[embassy_executor::task]
 async fn ws2812_exec(
@@ -20,7 +19,7 @@ async fn ws2812_exec(
     spi1: hal::Peri<'static, hal::peripherals::SPI1>,
     dma1_ch3: hal::Peri<'static, hal::peripherals::DMA1_CH3>,
 ) {
-    let mut ws2812 = ws2812::Ws2812::init(pin, spi1, dma1_ch3);
+    let mut ws2812 = drivers::ws2812::Ws2812::new(pin, spi1, dma1_ch3);
 
     let mut phases: [u16; 6] = [0; 6];
     for i in 0..6 {
@@ -64,7 +63,7 @@ async fn ws2812_exec(
                 output[ledno].b += 1;
             }
         }
-        ws2812.start(output).await;
+        ws2812.start(&output).await;
         Timer::after_millis(30).await;
     }
 }
