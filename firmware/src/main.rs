@@ -90,11 +90,11 @@ async fn main(spawner: Spawner) -> ! {
     spawner.spawn(ws2812_exec(p.PC6, p.SPI1, p.DMA1_CH3)).unwrap();
 
     let mut clock = Ticker::every(Duration::from_millis(50));
-    util::text::scroll(b"Test123", 32, &mut clock).await;
-    util::text::clear_scroll(&mut clock).await;
 
     loop {
-        let event = Buttons::event().await;
-        Matrix::fb().store(3 + event.button as usize, 7, if event.pressed { 32 } else { 0 });
+        util::text::scroll(b"Die Fachschaft Elektro- und Informationstechnik an der \x80 Universit\xE4t Stuttgart w\xFCnscht euch allen recht herzlich ein frohes Weihnachtsfest!", 32, &mut clock).await;
+        util::text::clear_scroll(&mut clock).await;
+        // let event = Buttons::event().await;
+        // Matrix::fb().store(3 + event.button as usize, 7, if event.pressed { 32 } else { 0 });
     }
 }

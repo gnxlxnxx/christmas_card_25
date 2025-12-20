@@ -5,6 +5,7 @@ set -e
 release_dir="$(dirname "$0")/target/riscv32ec-unknown-none-elf/release/"
 
 cargo build --release
+size "$release_dir/fsei-xmas-card-25"
 riscv64-elf-objcopy -R .storage -O binary \
 	"$release_dir/fsei-xmas-card-25" \
 	"$release_dir/fsei-xmas-card-25.bin"
