@@ -293,6 +293,7 @@ dependencies = [
  "ch32-hal",
  "critical-section",
  "embassy-executor",
+ "embassy-futures",
  "embassy-sync",
  "embassy-time",
  "embassy-time-driver",

@@ -1,7 +1,9 @@
-use core::{any::Any, arch::asm, cell::{Cell, RefCell}, mem, sync::atomic::{AtomicU8, Ordering}, u16};
+use core::{any::Any, arch::asm, cell::{Cell, RefCell}, default, mem::{self, MaybeUninit}, ops::Sub, primitive::u16, sync::atomic::{AtomicBool, AtomicU8, Ordering}};
 
 use ch32_hal::{self as hal, Peri, delay::Delay, gpio::{AnyPin, Pin}, interrupt::InterruptExt, pac::{self, gpio::vals::{Cnf, Mode}, timer::vals::{CcmrInputCcs, CcmrOutputCcs, FilterValue, Mms, Ocm, Urs}}, peripherals, time::Hertz, timer::{Channel, CoreInstance, low_level::{CountingMode, OutputCompareMode, Timer}}};
 use critical_section::Mutex;
+use embassy_executor::Spawner;
+use embassy_sync::{blocking_mutex::raw::{CriticalSectionRawMutex, NoopRawMutex}, channel::Channel as EmbChannel, signal::Signal};
 use embassy_time_driver::{Driver, time_driver_impl};
 use embassy_time_queue_utils::Queue;
 use crate::hal::interrupt;
@@ -29,7 +31,11 @@ const GAMMA_LUT: [u16; 256] = [
 
 const ROWS: usize = 9;
 
-const FB_EXAMPLE: [[u8; MatrixFb::WIDTH]; MatrixFb::HEIGHT] = [
+const HIST_LOW: u16 = 80;
+const HIST_HIGH: u16 = 96;
+const FILT_LEN: u8 = 6;
+
+const FB_EXAMPLE: [[u8; Framebuffer::WIDTH]; Framebuffer::HEIGHT] = [
     [32, 0, 0, 0, 0, 0, 0, 0],
     [0, 32, 0, 0, 0, 0, 0, 0],
     [0, 0, 32, 0, 0, 0, 0, 0],
@@ -41,9 +47,18 @@ const FB_EXAMPLE: [[u8; MatrixFb::WIDTH]; MatrixFb::HEIGHT] = [
     [0, 0, 0, 0, 64, 0, 0, 0],
 ];
 
-static FB: MatrixFb = MatrixFb::from_u8_array(FB_EXAMPLE);
-static mut INT: Option<MatrixInterrupt> = None;
-// static BTN_WAKER
+static mut MATRIX_DRIVER: MaybeUninit<MatrixDriver> = MaybeUninit::uninit();
+
+static FB: Framebuffer = Framebuffer::from_u8_array(FB_EXAMPLE);
+static BTN_STATE: ButtonArray<AtomicBool> = ButtonArray([
+    AtomicBool::new(false),
+    AtomicBool::new(false),
+    AtomicBool::new(false),
+    AtomicBool::new(false),
+]);
+
+static BTN_SAMPLE_SIGNAL: Signal<CriticalSectionRawMutex, ButtonSample> = Signal::new();
+static BTN_EVENT_CHANNEL: EmbChannel<CriticalSectionRawMutex, (Button, bool), 3> = EmbChannel::new();
 
 time_driver_impl!(static TIME_DRIVER: TimeDriver = TimeDriver {
     now: Mutex::new(Cell::new(0)),
@@ -52,9 +67,9 @@ time_driver_impl!(static TIME_DRIVER: TimeDriver = TimeDriver {
 });
 
 #[derive(Debug)]
-pub struct MatrixFb(pub [[AtomicU8; Self::WIDTH]; Self::HEIGHT]);
+pub struct Framebuffer(pub [[AtomicU8; Self::WIDTH]; Self::HEIGHT]);
 
-impl MatrixFb {
+impl Framebuffer {
     pub const WIDTH: usize = (ROWS - 1);
     pub const HEIGHT: usize = ROWS;
 
@@ -67,7 +82,7 @@ impl MatrixFb {
     }
 
     pub const fn from_u8_array(arr: [[u8; Self::WIDTH]; Self::HEIGHT]) -> Self {
-        Self(unsafe { mem::transmute(arr) })
+        Self(unsafe { mem::transmute::<[[u8; 8]; 9], [[AtomicU8; 8]; 9]>(arr) })
     }
 
     pub fn load(&self, x: usize, y: usize) -> u8 {
@@ -217,55 +232,71 @@ impl<'a> ButtonPins<'a> {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
-enum AltGroup {
-    PosIn,
-    NegOut
+#[repr(usize)]
+pub enum Button {
+    Start = 3,
+    Select = 0,
+    L = 2,
+    R = 1
+}
+
+impl TryFrom<usize> for Button {
+    type Error = ();
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        match(value) {
+            0 => Ok(Self::Select),
+            1 => Ok(Self::R),
+            2 => Ok(Self::L),
+            3 => Ok(Self::Start),
+            _ => Err(())
+        }
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
 struct ButtonArray<T>([T; 4]);
 
 impl<T> ButtonArray<T> {
-    fn start(&self) -> &T {
-        &self.0[3]
+    const fn get(&self, btn: Button) -> &T {
+        &self.0[btn as usize]
     }
 
-    fn select(&self) -> &T {
-        &self.0[0]
+    fn set(&mut self, btn: Button, val: T) {
+        self.0[btn as usize] = val;
     }
 
-    fn l(&self) -> &T {
-        &self.0[2]
+    const fn each_ref(&self) -> ButtonArray<&T> {
+        ButtonArray(self.0.each_ref())
     }
 
-    fn r(&self) -> &T {
-        &self.0[1]
-    }
-
-    fn set_start(&mut self, val: T) {
-        self.0[3] = val;
-    }
-
-    fn set_select(&mut self, val: T) {
-        self.0[0] = val;
-    }
-
-    fn set_l(&mut self, val: T) {
-        self.0[2] = val;
-    }
-
-    fn set_r(&mut self, val: T) {
-        self.0[1] = val;
+    fn map<U>(self, f: impl FnMut(T) -> U) -> ButtonArray<U> {
+        ButtonArray(self.0.map(f))
     }
 }
 
-#[derive(Eq, PartialEq, Clone, Copy)]
-enum ButtonMeasurement {
-    StartTime(u16),
-    Measurements(ButtonArray<u16>, pac::timer::regs::Intfr)
+impl<T: Sub + Copy> Sub<T> for ButtonArray<T> {
+    type Output = ButtonArray<T::Output>;
+
+    fn sub(self, rhs: T) -> Self::Output {
+        self.map(|l| l - rhs)
+    }
 }
 
-struct MatrixInterrupt {
+#[derive(Clone, Copy, Default)]
+struct ButtonSample {
+    start_cnt: u16,
+    btn_cnt: ButtonArray<u16>,
+    intfr: pac::timer::regs::Intfr
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+enum AltGroup {
+    PosIn,
+    NegOut
+}
+
+struct MatrixDriver {
     led: LedPins<'static>,
     btn: ButtonPins<'static>,
     tim1: Timer<'static, peripherals::TIM1>,
@@ -273,19 +304,19 @@ struct MatrixInterrupt {
 
     cycles: u32,
 
-    last_tim_start: u16,
+    start_cnt: u16,
     row: usize,
     next_group: AltGroup
 }
 
-impl MatrixInterrupt {
+impl MatrixDriver {
     fn get_val(&self, col: usize) -> u32 {
         let x = if col <= self.row { col } else { col - 1 };
 
         self.cycles - (GAMMA_LUT[FB.try_load(x, self.row).unwrap_or(0) as usize] as u32)
     }
 
-    fn advance_group(&mut self) -> ButtonMeasurement {
+    fn setup_next_group(&mut self) -> Option<(ButtonArray<u16>, pac::timer::regs::Intfr)> {
         match self.next_group {
             AltGroup::PosIn => {
                 self.row = if self.row < ROWS - 1 { self.row + 1 } else { 0 };
@@ -302,9 +333,9 @@ impl MatrixInterrupt {
                 });
 
                 // Set pwm values
-                self.tim1.set_compare_value(Channel::Ch1, self.get_val(5).into());
-                self.tim1.set_compare_value(Channel::Ch2, self.get_val(2).into());
-                self.tim1.set_compare_value(Channel::Ch4, self.get_val(7).into());
+                self.tim1.set_compare_value(Channel::Ch1, self.get_val(5));
+                self.tim1.set_compare_value(Channel::Ch2, self.get_val(2));
+                self.tim1.set_compare_value(Channel::Ch4, self.get_val(7));
 
                 // TIM1: Attach positive led pins
                 // TIM2: Attach button pins as inputs with pull resistor
@@ -372,21 +403,20 @@ impl MatrixInterrupt {
                 });
 
                 // TIM2: Set pulldown on button pins
-                let mut start_time = 0;
                 critical_section::with(|_| {
-                    start_time = self.tim2.regs_basic().cnt().read();
+                    self.start_cnt = self.tim2.regs_basic().cnt().read();
                     self.btn.set_low_all();
                 });
 
 
-                ButtonMeasurement::StartTime(start_time)
+                None
             },
 
             AltGroup::NegOut => {
                 self.next_group = AltGroup::PosIn;
 
                 let intfr = self.tim2.regs_gp16().intfr().read();
-                let measurement = ButtonArray([
+                let btn_cnt = ButtonArray([
                     self.tim2.get_capture_value(Channel::Ch1) as u16,
                     self.tim2.get_capture_value(Channel::Ch2) as u16,
                     self.tim2.get_capture_value(Channel::Ch3) as u16,
@@ -434,12 +464,12 @@ impl MatrixInterrupt {
                 });
 
                 // Set pwm values
-                self.tim1.set_compare_value(Channel::Ch1, self.get_val(0).into());
-                self.tim1.set_compare_value(Channel::Ch2, self.get_val(1).into());
-                self.tim2.set_compare_value(Channel::Ch1, self.get_val(8).into());
-                self.tim2.set_compare_value(Channel::Ch2, self.get_val(6).into());
-                self.tim2.set_compare_value(Channel::Ch3, self.get_val(3).into());
-                self.tim2.set_compare_value(Channel::Ch4, self.get_val(4).into());
+                self.tim1.set_compare_value(Channel::Ch1, self.get_val(0));
+                self.tim1.set_compare_value(Channel::Ch2, self.get_val(1));
+                self.tim2.set_compare_value(Channel::Ch1, self.get_val(8));
+                self.tim2.set_compare_value(Channel::Ch2, self.get_val(6));
+                self.tim2.set_compare_value(Channel::Ch3, self.get_val(3));
+                self.tim2.set_compare_value(Channel::Ch4, self.get_val(4));
 
                 self.btn.set_high_all();
 
@@ -475,52 +505,80 @@ impl MatrixInterrupt {
                     w.set_cnf(7, Cnf::ANALOG_IN__PUSH_PULL_OUT);
                 });
 
-                ButtonMeasurement::Measurements(measurement, intfr)
+                Some((btn_cnt, intfr))
             }
         }
     }
 
     fn advance(&mut self) {
         self.led.set_float_all();
-        let measurement = self.advance_group();
+        let result = self.setup_next_group();
         self.led.set_high(self.row);
 
-        if let ButtonMeasurement::StartTime(t) = measurement {
-            self.last_tim_start = t;
-            FB.show_u16(0, t);
+        if let Some((btn_cnt, intfr)) = result {
+            BTN_SAMPLE_SIGNAL.signal(ButtonSample { start_cnt: self.start_cnt, btn_cnt, intfr });
         }
     }
 }
 
 #[interrupt]
 fn TIM1_UP() {
-    let matrix_int = unsafe {
-        (&mut *&raw mut INT).as_mut().unwrap_unchecked()
-    };
+    #[allow(static_mut_refs)]
+    let matrix_driver = unsafe { MATRIX_DRIVER.assume_init_mut() };
 
-    if matrix_int.tim1.clear_update_interrupt() {
-        matrix_int.advance();
+    if matrix_driver.tim1.clear_update_interrupt() {
+        matrix_driver.advance();
+
+        TIME_DRIVER.advance();
+    }
+}
+
+#[derive(Debug)]
+struct TimeDriver {
+    now: Mutex<Cell<u64>>,
+    next: Mutex<Cell<u64>>,
+    queue: critical_section::Mutex<RefCell<Queue>>
+}
+
+impl TimeDriver {
+    fn advance(&self) {
+        critical_section::with(|cs| {
+            let now_box = self.now.borrow(cs);
+            let next_box = self.next.borrow(cs);
+
+            let now = now_box.get() + 1;
+            now_box.set(now);
+
+            if next_box.get() <= now {
+                next_box.set(self.queue.borrow_ref_mut(cs).next_expiration(now));
+            }
+        });
+    }
+}
+
+impl Driver for TimeDriver {
+    fn now(&self) -> u64 {
+        critical_section::with(|cs| self.now.borrow(cs).get() )
     }
 
-    critical_section::with(|cs| {
-        let now_box = TIME_DRIVER.now.borrow(cs);
-        let next_box = TIME_DRIVER.next.borrow(cs);
-
-        let now = now_box.get() + 1;
-        now_box.set(now);
-
-        if next_box.get() <= now {
-            next_box.set(TIME_DRIVER.queue.borrow_ref_mut(cs).next_expiration(now));
-        }
-    });
+    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {
+        critical_section::with(|cs| {
+            let mut queue = self.queue.borrow_ref_mut(cs);
+            if queue.schedule_wake(at, waker) {
+                self.next.borrow(cs).set(queue.next_expiration(self.now()));
+            }
+        });
+    }
 }
 
 pub struct Matrix {
-    fb: &'static MatrixFb
+    _private: ()
 }
 
 impl Matrix {
-    pub fn new(
+    pub fn init(
+        spawner: Spawner,
+
         led: LedPins<'static>,
         btn: ButtonPins<'static>,
 
@@ -559,13 +617,14 @@ impl Matrix {
         tim1.start();
 
         unsafe {
-            INT = Some(MatrixInterrupt {
+            #[allow(static_mut_refs)]
+            MATRIX_DRIVER.write(MatrixDriver {
                 led,
                 btn,
                 tim1,
                 tim2,
                 cycles,
-                last_tim_start: 0,
+                start_cnt: 0,
                 row: 8,
                 next_group: AltGroup::PosIn
             });
@@ -573,34 +632,60 @@ impl Matrix {
             hal::interrupt::TIM1_UP.enable();
         }
 
-        Self { fb: &FB }
+        spawner.spawn(process_btn_samples()).unwrap();
+
+        Self { _private: () }
     }
 
-    pub fn fb(&self) -> &MatrixFb {
-        self.fb
-    }
-}
-
-struct TimeDriver {
-    now: Mutex<Cell<u64>>,
-    next: Mutex<Cell<u64>>,
-    queue: critical_section::Mutex<RefCell<Queue>>
-}
-
-impl Driver for TimeDriver {
-    fn now(&self) -> u64 {
-        let mut now = 0;
-        critical_section::with(|cs| now = self.now.borrow(cs).get() );
-
-        now
+    pub fn fb(&self) -> &Framebuffer {
+        &FB
     }
 
-    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {
-        critical_section::with(|cs| {
-            let mut queue = self.queue.borrow_ref_mut(cs);
-            if queue.schedule_wake(at, waker) {
-                self.next.borrow(cs).set(queue.next_expiration(self.now()));
+    pub fn btn(&self, btn: Button) -> bool {
+        BTN_STATE.get(btn).load(Ordering::Relaxed)
+    }
+
+    pub async fn btn_event(&self) -> (Button, bool) {
+        BTN_EVENT_CHANNEL.receive().await
+    }
+
+    pub async fn btn_event_filtered(&self, btn: Option<Button>, pressed: Option<bool>)
+        -> (Button, bool)
+    {
+        loop {
+            let event = self.btn_event().await;
+            if btn.map_or(true, |b| b == event.0) && pressed.map_or(true, |p| p == event.1) {
+                return event;
             }
-        });
+        }
+    }
+}
+
+#[embassy_executor::task]
+async fn process_btn_samples() {
+    let mut fcount = ButtonArray::<u8>::default();
+
+    loop {
+        let sample = BTN_SAMPLE_SIGNAL.wait().await;
+        let state = BTN_STATE.each_ref().map(|s| s.load(Ordering::Relaxed));
+
+        for (ch, (((prev_state, next_state), cnt), fcount)) in state.0.iter()
+            .zip(BTN_STATE.0.iter())
+            .zip(sample.btn_cnt.0.iter())
+            .zip(fcount.0.iter_mut())
+            .enumerate()
+        {
+            let lvl = if sample.intfr.ccif(ch) { cnt - sample.start_cnt } else { u16::MAX };
+
+            *fcount = if prev_state ^ (lvl >= if *prev_state { HIST_LOW } else { HIST_HIGH }) {
+                if *fcount < FILT_LEN {
+                    *fcount + 1
+                } else {
+                    next_state.store(!prev_state, Ordering::Relaxed);
+                    BTN_EVENT_CHANNEL.send((ch.try_into().unwrap(), !prev_state)).await;
+                    0
+                }
+            } else { 0 }
+        }
     }
 }
