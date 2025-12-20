@@ -1,6 +1,9 @@
-use core::{any::Any, arch::asm, mem, sync::atomic::{AtomicU8, Ordering}, u16};
+use core::{any::Any, arch::asm, cell::{Cell, RefCell}, mem, sync::atomic::{AtomicU8, Ordering}, u16};
 
 use ch32_hal::{self as hal, Peri, delay::Delay, gpio::{AnyPin, Pin}, interrupt::InterruptExt, pac::{self, gpio::vals::{Cnf, Mode}, timer::vals::{CcmrInputCcs, CcmrOutputCcs, FilterValue, Mms, Ocm, Urs}}, peripherals, time::Hertz, timer::{Channel, CoreInstance, low_level::{CountingMode, OutputCompareMode, Timer}}};
+use critical_section::Mutex;
+use embassy_time_driver::{Driver, time_driver_impl};
+use embassy_time_queue_utils::Queue;
 use crate::hal::interrupt;
 
 // Gamma brightness lookup table <https://victornpb.github.io/gamma-table-generator>
@@ -38,8 +41,15 @@ const FB_EXAMPLE: [[u8; MatrixFb::WIDTH]; MatrixFb::HEIGHT] = [
     [0, 0, 0, 0, 64, 0, 0, 0],
 ];
 
-static MATRIX_FB: MatrixFb = MatrixFb::from_u8_array(FB_EXAMPLE);
-static mut MATRIX_INT: Option<MatrixInterrupt> = None;
+static FB: MatrixFb = MatrixFb::from_u8_array(FB_EXAMPLE);
+static mut INT: Option<MatrixInterrupt> = None;
+// static BTN_WAKER
+
+time_driver_impl!(static TIME_DRIVER: TimeDriver = TimeDriver {
+    now: Mutex::new(Cell::new(0)),
+    next: Mutex::new(Cell::new(0)),
+    queue: Mutex::new(RefCell::new(Queue::new()))
+});
 
 #[derive(Debug)]
 pub struct MatrixFb(pub [[AtomicU8; Self::WIDTH]; Self::HEIGHT]);
@@ -272,7 +282,7 @@ impl MatrixInterrupt {
     fn get_val(&self, col: usize) -> u32 {
         let x = if col <= self.row { col } else { col - 1 };
 
-        self.cycles - (GAMMA_LUT[MATRIX_FB.try_load(x, self.row).unwrap_or(0) as usize] as u32)
+        self.cycles - (GAMMA_LUT[FB.try_load(x, self.row).unwrap_or(0) as usize] as u32)
     }
 
     fn advance_group(&mut self) -> ButtonMeasurement {
@@ -322,7 +332,7 @@ impl MatrixInterrupt {
                 });
 
                 // TIM2: Disable all channels to allow changing ccs bits
-                self.tim2.regs_gp16().ccer().write(|w| ());
+                self.tim2.regs_gp16().ccer().write(|_| ());
 
                 // TIM2: Select alternate mapping with button pins
                 pac::AFIO.pcfr1().modify(|w| w.set_tim2_rm(0));
@@ -362,10 +372,14 @@ impl MatrixInterrupt {
                 });
 
                 // TIM2: Set pulldown on button pins
-                self.btn.set_low_all();
+                let mut start_time = 0;
+                critical_section::with(|_| {
+                    start_time = self.tim2.regs_basic().cnt().read();
+                    self.btn.set_low_all();
+                });
 
 
-                ButtonMeasurement::StartTime(self.tim2.regs_basic().cnt().read())
+                ButtonMeasurement::StartTime(start_time)
             },
 
             AltGroup::NegOut => {
@@ -388,7 +402,7 @@ impl MatrixInterrupt {
                 });
 
                 // TIM2: Disable all channels to allow changing ccs bits
-                self.tim2.regs_gp16().ccer().write(|w| ());
+                self.tim2.regs_gp16().ccer().write(|_| ());
 
                 // TIM2: Select alternate mapping with leds
                 pac::AFIO.pcfr1().modify(|w| w.set_tim2_rm(3));
@@ -467,51 +481,38 @@ impl MatrixInterrupt {
     }
 
     fn advance(&mut self) {
-        let t = self.tim1.regs_basic().cnt().read();
         self.led.set_float_all();
-
         let measurement = self.advance_group();
-
         self.led.set_high(self.row);
-
-        let t2 = self.tim1.regs_basic().cnt().read();
 
         if let ButtonMeasurement::StartTime(t) = measurement {
             self.last_tim_start = t;
+            FB.show_u16(0, t);
         }
-
-        if self.row == crate::I.0.load(Ordering::Relaxed)
-            && self.next_group == if crate::I.1.load(Ordering::Relaxed) { AltGroup::NegOut } else { AltGroup::PosIn } {
-            MATRIX_FB.show_u16(0, t);
-            MATRIX_FB.show_u16(2, t2);
-        }
-
-
-        // if let ButtonMeasurement::Measurements(measurement, intfr) = measurement {
-        //     for (i, val) in measurement.0.iter().enumerate() {
-        //         let mut val = *val - self.last_tim_start;
-        //         for j in 0..16 {
-        //             MATRIX_FB.store(j%8, 2*i + j/8, if val&1 != 0 { 32 } else { 0 });
-        //             val >>= 1;
-        //         }
-        //     }
-        //
-        //     for i in 0..4 {
-        //         MATRIX_FB.store(i, 8, if intfr.ccif(i) { 32 } else { 0 });
-        //     }
-        // }
     }
 }
 
 #[interrupt]
 fn TIM1_UP() {
     let matrix_int = unsafe {
-        (&mut *&raw mut MATRIX_INT).as_mut().unwrap_unchecked()
+        (&mut *&raw mut INT).as_mut().unwrap_unchecked()
     };
 
     if matrix_int.tim1.clear_update_interrupt() {
         matrix_int.advance();
     }
+
+    critical_section::with(|cs| {
+        let now_box = TIME_DRIVER.now.borrow(cs);
+        let next_box = TIME_DRIVER.next.borrow(cs);
+
+        let now = now_box.get() + 1;
+        now_box.set(now);
+
+        if next_box.get() <= now {
+            next_box.set(TIME_DRIVER.queue.borrow_ref_mut(cs).next_expiration(now));
+        }
+    });
 }
 
 pub struct Matrix {
@@ -558,7 +559,7 @@ impl Matrix {
         tim1.start();
 
         unsafe {
-            MATRIX_INT = Some(MatrixInterrupt {
+            INT = Some(MatrixInterrupt {
                 led,
                 btn,
                 tim1,
@@ -572,10 +573,34 @@ impl Matrix {
             hal::interrupt::TIM1_UP.enable();
         }
 
-        Self { fb: &MATRIX_FB }
+        Self { fb: &FB }
     }
 
     pub fn fb(&self) -> &MatrixFb {
         self.fb
+    }
+}
+
+struct TimeDriver {
+    now: Mutex<Cell<u64>>,
+    next: Mutex<Cell<u64>>,
+    queue: critical_section::Mutex<RefCell<Queue>>
+}
+
+impl Driver for TimeDriver {
+    fn now(&self) -> u64 {
+        let mut now = 0;
+        critical_section::with(|cs| now = self.now.borrow(cs).get() );
+
+        now
+    }
+
+    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {
+        critical_section::with(|cs| {
+            let mut queue = self.queue.borrow_ref_mut(cs);
+            if queue.schedule_wake(at, waker) {
+                self.next.borrow(cs).set(queue.next_expiration(self.now()));
+            }
+        });
     }
 }
