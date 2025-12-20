@@ -3,8 +3,9 @@
 #![feature(type_alias_impl_trait)]
 
 pub mod drivers;
+pub mod util;
 
-use embassy_time::Timer;
+use embassy_time::{Duration, Ticker, Timer};
 use panic_halt as _;
 use embassy_executor::Spawner;
 use ch32_hal::{self as hal};
@@ -68,6 +69,15 @@ async fn ws2812_exec(
     }
 }
 
+async fn test() {
+    for _ in 0..10 {
+        Matrix::fb().store(0, 0, 32);
+        Timer::after_millis(500).await;
+        Matrix::fb().store(0, 0, 0);
+        Timer::after_millis(500).await;
+    }
+}
+
 #[embassy_executor::main(entry = "ch32_hal::entry")]
 async fn main(spawner: Spawner) -> ! {
     let p = hal::init(hal::Config {
@@ -78,6 +88,10 @@ async fn main(spawner: Spawner) -> ! {
     let btn = buttons::Pins::new(p.PD7, p.PD4, p.PC0, p.PD3);
     drivers::timer_init(spawner, led, btn, p.TIM1, p.TIM2);
     spawner.spawn(ws2812_exec(p.PC6, p.SPI1, p.DMA1_CH3)).unwrap();
+
+    let mut clock = Ticker::every(Duration::from_millis(50));
+    util::text::scroll(b"Test123", 32, &mut clock).await;
+    util::text::clear_scroll(&mut clock).await;
 
     loop {
         let event = Buttons::event().await;
