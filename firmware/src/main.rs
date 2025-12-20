@@ -27,7 +27,7 @@ use panic_halt as _;
 use crate::matrix::{Button, ButtonPins, Framebuffer, LedPins, Matrix};
 
 pub mod ws2812;
-use crate::ws2812::{Color, HUETABLE, RANDS, SINTABLE};
+use crate::ws2812::Ws2812Mode;
 
 #[embassy_executor::task(pool_size = 1)]
 async fn ws2812_exec(
@@ -37,50 +37,9 @@ async fn ws2812_exec(
 ) {
     let mut ws2812 = ws2812::Ws2812::init(pin, spi1, dma1_ch3);
 
-    let mut phases: [u16; 6] = [0; 6];
-    for i in 0..6 {
-        phases[i] = (i as u16) << 8;
-    }
-
-    let mut desired_output: [Color; 6] = [Color::new(0, 0, 0); 6];
-    let mut output: [Color; 6] = [Color::new(0, 0, 0); 6];
-
+    let mut mode = Ws2812Mode::new();
     loop {
-        for k in 0..6 {
-            phases[k] += (((RANDS[k] as u16 + 0xf) << 2) + ((RANDS[k] as u16 + 0xf) << 1)) >> 1;
-        }
-
-        for ledno in 0..6 {
-            // TODO add more modes
-
-            // Original "Fire" mode
-            let index: usize = ((phases[ledno]) >> 8) as usize;
-            let rs: u8 = SINTABLE[index] >> 3;
-
-            desired_output[ledno].r = (HUETABLE[((rs + 30) & 0xff) as usize] as u32 >> 2) as u8;
-            desired_output[ledno].g = (HUETABLE[(rs + 0) as usize] as u32 >> 3) as u8;
-            desired_output[ledno].b = (HUETABLE[((rs + 190) & 0xff) as usize] as u32 >> 3) as u8;
-
-            if output[ledno].r > desired_output[ledno].r {
-                output[ledno].r -= 1;
-            } else if output[ledno].r < desired_output[ledno].r {
-                output[ledno].r += 1;
-            }
-
-            if output[ledno].g > desired_output[ledno].g {
-                output[ledno].g -= 1;
-            } else if output[ledno].g < desired_output[ledno].g {
-                output[ledno].g += 1;
-            }
-
-            if output[ledno].b > desired_output[ledno].b {
-                output[ledno].b -= 1;
-            } else if output[ledno].b < desired_output[ledno].b {
-                output[ledno].b += 1;
-            }
-        }
-        ws2812.start(output).await;
-        Timer::after_millis(30).await;
+        ws2812.run_mode(&mut mode).await;
     }
 }
 
