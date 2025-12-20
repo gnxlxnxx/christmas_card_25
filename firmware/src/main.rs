@@ -59,6 +59,7 @@ async fn main(spawner: Spawner) -> ! {
 
     loop {
         util::text::scroll(b"Die Fachschaft Elektro- und Informationstechnik an der \x80 Universit\xE4t Stuttgart w\xFCnscht euch allen recht herzlich ein frohes Weihnachtsfest!", 32, &mut clock).await;
+        // util::text::scroll(b" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~", 32, &mut clock).await;
         util::text::clear_scroll(&mut clock).await;
         // let event = Buttons::event().await;
         // Matrix::fb().store(3 + event.button as usize, 7, if event.pressed { 32 } else { 0 });
