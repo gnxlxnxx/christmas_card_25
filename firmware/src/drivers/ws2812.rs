@@ -2,6 +2,8 @@ use ch32_hal as hal;
 use hal::spi::{Config, Spi};
 use hal::{Peri, peripherals};
 
+use embassy_time::Timer;
+
 const BITQUARTETS: [u16; 16] = [
     0b1000100010001000,
     0b1000100010001110,
@@ -21,7 +23,7 @@ const BITQUARTETS: [u16; 16] = [
     0b1110111011101110,
 ];
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -45,6 +47,7 @@ impl Color {
 
 pub struct Ws2812<'a> {
     spi: Spi<'a, peripherals::SPI1, ch32_hal::mode::Async>,
+    output: [Color; 6],
 }
 
 impl<'a> Ws2812<'a> {
@@ -58,21 +61,167 @@ impl<'a> Ws2812<'a> {
 
         spi_config.frequency = hal::prelude::Hertz::hz(3_000_000);
 
-        let spi = Spi::new_txonly_nosck::<0>(spi1, pin, dma1_ch3, spi_config);
+        let mut spi = Spi::new_txonly_nosck::<0>(spi1, pin, dma1_ch3, spi_config);
+        let mut output = [Color::new(0, 0, 0); 6];
 
-        Self { spi }
+        Self { spi, output }
     }
 
-    pub async fn start(&mut self, colors: &[Color; 6]) {
+    pub async fn set_colors(&mut self, colors: [Color; 6]) {
+        self.output = colors;
+        self.start().await;
+    }
 
+    async fn start(&mut self) {
         // I have 2 leading and one trailing led full of '0's
         let mut buf = [[0u16; 6]; 6 + 3];
 
         for (i, led) in (&mut buf[2..8]).into_iter().enumerate() {
-            colors[i].to_slices_grb(led);
+            self.output[i].to_slices_grb(led);
         }
 
-        self.spi.write::<u16>(&buf.as_flattened()).await.unwrap(); // surely this unwrap will never fail ...
+        let _ = self.spi.write::<u16>(&buf.as_flattened()).await;
+    }
+
+    pub async fn run_mode(&mut self, mode: &mut Ws2812Mode) {
+        let mut desired_output: [Color; 6] = [Color::new(0, 0, 0); 6];
+
+        match mode {
+            Ws2812Mode::Fire { phases } => {
+                // Original "Fire" mode
+
+                Timer::after_millis(30).await;
+
+                for k in 0..6 {
+                    phases[k] +=
+                        (((RANDS[k] as u16 + 0xf) << 2) + ((RANDS[k] as u16 + 0xf) << 1)) >> 1;
+                }
+
+                for ledno in 0..6 {
+                    let index: usize = (phases[ledno] >> 8) as usize;
+                    let rs: u8 = SINTABLE[index] >> 3;
+
+                    desired_output[ledno].r =
+                        (HUETABLE[((rs + 30) & 0xff) as usize] as u32 >> 2) as u8;
+                    desired_output[ledno].g = (HUETABLE[(rs + 0) as usize] as u32 >> 3) as u8;
+                    desired_output[ledno].b =
+                        (HUETABLE[((rs + 190) & 0xff) as usize] as u32 >> 3) as u8;
+                }
+            }
+            Ws2812Mode::Snowball { counter, snowballs } => {
+                // "Snowball" mode
+
+                Timer::after_millis(5).await;
+
+                if *counter == 300 {
+                    for ledno in 0..6 {
+                        let num_snowballs_l: u8 = snowballs[3..6]
+                            .iter()
+                            .filter(|snowball| **snowball != Color::new(0, 0, 0))
+                            .count() as u8;
+                        let num_snowballs_r: u8 = snowballs[0..3]
+                            .iter()
+                            .filter(|snowball| **snowball != Color::new(0, 0, 0))
+                            .count() as u8;
+                        let mut hue: u8 = rand8();
+                        snowballs[0] = snowballs[1];
+                        snowballs[1] = snowballs[2];
+                        snowballs[2] = if rand8() % (3 + num_snowballs_r) != 0 {
+                            Color::new(0, 0, 0)
+                        } else {
+                            Color::new(
+                                HUETABLE[((hue + 85) & 0xff) as usize],
+                                HUETABLE[(hue + 0) as usize],
+                                HUETABLE[((hue + 170) & 0xff) as usize],
+                            )
+                        };
+
+                        hue = rand8();
+                        snowballs[5] = snowballs[4];
+                        snowballs[4] = snowballs[3];
+                        snowballs[3] = if rand8() % (3 + num_snowballs_l) != 0 {
+                            Color::new(0, 0, 0)
+                        } else {
+                            Color::new(
+                                HUETABLE[((hue + 85) & 0xff) as usize],
+                                HUETABLE[(hue + 0) as usize],
+                                HUETABLE[((hue + 170) & 0xff) as usize],
+                            )
+                        };
+                    }
+                    *counter = 0;
+                } else {
+                    for ledno in 0..6 {
+                        desired_output[ledno] = snowballs[ledno];
+                    }
+                    *counter += 1;
+                }
+            }
+
+            Ws2812Mode::Huewheel { ws2812_counter } => {
+                // "Huewheel" mode
+
+                Timer::after_millis(2).await;
+
+                for ledno in 0..6 {
+                    let ang: usize = (*ws2812_counter as usize >> 3) + ledno * 60;
+                    desired_output[ledno].r = HUETABLE[(ang + 85) & 0xff];
+                    desired_output[ledno].g = HUETABLE[ang & 0xff];
+                    desired_output[ledno].b = HUETABLE[(ang + 170) & 0xff];
+                }
+                *ws2812_counter = (*ws2812_counter + 1) & 0x7ff;
+            }
+        }
+
+        for ledno in 0..6 {
+            if self.output[ledno].r > desired_output[ledno].r {
+                self.output[ledno].r -= 1;
+            } else if self.output[ledno].r < desired_output[ledno].r {
+                self.output[ledno].r += 1;
+            }
+
+            if self.output[ledno].g > desired_output[ledno].g {
+                self.output[ledno].g -= 1;
+            } else if self.output[ledno].g < desired_output[ledno].g {
+                self.output[ledno].g += 1;
+            }
+
+            if self.output[ledno].b > desired_output[ledno].b {
+                self.output[ledno].b -= 1;
+            } else if self.output[ledno].b < desired_output[ledno].b {
+                self.output[ledno].b += 1;
+            }
+        }
+
+        self.start().await;
+    }
+}
+
+pub enum Ws2812Mode {
+    Fire { phases: [u16; 6] },
+    Snowball { counter: u32, snowballs: [Color; 6] },
+    Huewheel { ws2812_counter: u32 },
+}
+
+impl Ws2812Mode {
+    pub fn new() -> Self {
+        Self::new_snowball()
+    }
+    pub fn new_fire() -> Self {
+        let mut phases: [u16; 6] = [0; 6];
+        for i in 0..6 {
+            phases[i] = (i as u16) << 8;
+        }
+        Self::Fire { phases }
+    }
+    pub fn new_huewheel() -> Self {
+        let ws2812_counter = 0;
+        Self::Huewheel { ws2812_counter }
+    }
+    pub fn new_snowball() -> Self {
+        let counter = 0;
+        let snowballs: [Color; 6] = [Color::new(0, 0, 0); 6];
+        Self::Snowball { counter, snowballs }
     }
 }
 
@@ -132,3 +281,28 @@ pub const RANDS: [u8; 256] = [
     0xac, 0x86, 0x21, 0x2b, 0xaa, 0x1a, 0x55, 0xa2, 0xbe, 0x70, 0xb5, 0x73, 0x3b, 0x04, 0x5c, 0xd3,
     0x36, 0x94, 0xb3, 0xaf, 0xe2, 0xf0, 0xe4, 0x9e, 0x4f, 0x32, 0x15, 0x49, 0xfd, 0x82, 0x4e, 0xa9,
 ];
+
+/* White Noise Generator State */
+const NOISE_BITS: u32 = 8;
+const NOISE_MASK: u32 = ((1 << NOISE_BITS) - 1);
+const NOISE_POLY_TAP0: u32 = 31;
+const NOISE_POLY_TAP1: u32 = 21;
+const NOISE_POLY_TAP2: u32 = 1;
+const NOISE_POLY_TAP3: u32 = 0;
+static mut LFSR: u32 = 1;
+
+fn rand8() -> u8 {
+    let mut new_data: u32;
+
+    unsafe {
+        for bit in 0..NOISE_BITS {
+            new_data = ((LFSR >> NOISE_POLY_TAP0)
+                ^ (LFSR >> NOISE_POLY_TAP1)
+                ^ (LFSR >> NOISE_POLY_TAP2)
+                ^ (LFSR >> NOISE_POLY_TAP3));
+            LFSR = (LFSR << 1) | (new_data & 1);
+        }
+
+        (LFSR & NOISE_MASK) as u8
+    }
+}
