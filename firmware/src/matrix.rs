@@ -24,7 +24,9 @@ const GAMMA_LUT: [u16; 256] = [
     3584,3617,3650,3683,3716,3750,3784,3818,3852,3886,3920,3955,3990,4025,4060,4095,
 ];
 
-const FB_EXAMPLE: [[u8; 8]; 9] = [
+const ROWS: usize = 9;
+
+const FB_EXAMPLE: [[u8; MatrixFb::WIDTH]; MatrixFb::HEIGHT] = [
     [32, 0, 0, 0, 0, 0, 0, 0],
     [0, 32, 0, 0, 0, 0, 0, 0],
     [0, 0, 32, 0, 0, 0, 0, 0],
@@ -43,8 +45,8 @@ static mut MATRIX_INT: Option<MatrixInterrupt> = None;
 pub struct MatrixFb(pub [[AtomicU8; Self::WIDTH]; Self::HEIGHT]);
 
 impl MatrixFb {
-    const WIDTH: usize = 8;
-    const HEIGHT: usize = 9;
+    pub const WIDTH: usize = (ROWS - 1);
+    pub const HEIGHT: usize = ROWS;
 
     pub const fn new() -> Self {
         Self::new_filled(0)
@@ -62,12 +64,28 @@ impl MatrixFb {
         self.0[y][x].load(Ordering::Relaxed)
     }
 
+    pub fn try_load(&self, x: usize, y: usize) -> Option<u8> {
+        Some(self.0.get(y)?.get(x)?.load(Ordering::Relaxed))
+    }
+
     pub fn store(&self, x: usize, y: usize, val: u8) {
         self.0[y][x].store(val, Ordering::Relaxed)
     }
+
+    fn show_u8(&self, y: usize, mut val: u8) {
+        for i in (0..8).rev() {
+            self.store(i, y, if val & 1 != 0 { 32 } else { 0 });
+            val >>= 1;
+        }
+    }
+
+    fn show_u16(&self, y: usize, val: u16) {
+        self.show_u8(y, (val>>8) as u8);
+        self.show_u8(y + 1, val as u8);
+    }
 }
 
-pub struct LedPins<'a> ([Peri<'a, AnyPin>; 9]);
+pub struct LedPins<'a> ([Peri<'a, AnyPin>; ROWS]);
 
 impl<'a> LedPins<'a> {
     pub fn new(
@@ -245,22 +263,22 @@ struct MatrixInterrupt {
 
     cycles: u32,
 
+    last_tim_start: u16,
     row: usize,
     next_group: AltGroup
 }
 
 impl MatrixInterrupt {
-    fn get_val(&self, row: usize, col: usize) -> u32 {
-        let x = if col <= row { col } else { col - 1 };
-        let y = row;
+    fn get_val(&self, col: usize) -> u32 {
+        let x = if col <= self.row { col } else { col - 1 };
 
-        self.cycles - (GAMMA_LUT[MATRIX_FB.load(x, y) as usize] as u32)
+        self.cycles - (GAMMA_LUT[MATRIX_FB.try_load(x, self.row).unwrap_or(0) as usize] as u32)
     }
 
     fn advance_group(&mut self) -> ButtonMeasurement {
         match self.next_group {
             AltGroup::PosIn => {
-                self.row = (self.row + 1) % 9;
+                self.row = if self.row < ROWS - 1 { self.row + 1 } else { 0 };
                 self.next_group = AltGroup::NegOut;
 
                 // TIM1: Enable outputs
@@ -274,9 +292,9 @@ impl MatrixInterrupt {
                 });
 
                 // Set pwm values
-                self.tim1.set_compare_value(Channel::Ch1, self.get_val(self.row, 5).into());
-                self.tim1.set_compare_value(Channel::Ch2, self.get_val(self.row, 2).into());
-                self.tim1.set_compare_value(Channel::Ch4, self.get_val(self.row, 7).into());
+                self.tim1.set_compare_value(Channel::Ch1, self.get_val(5).into());
+                self.tim1.set_compare_value(Channel::Ch2, self.get_val(2).into());
+                self.tim1.set_compare_value(Channel::Ch4, self.get_val(7).into());
 
                 // TIM1: Attach positive led pins
                 // TIM2: Attach button pins as inputs with pull resistor
@@ -402,14 +420,12 @@ impl MatrixInterrupt {
                 });
 
                 // Set pwm values
-                self.tim1.set_compare_value(Channel::Ch1, self.get_val(self.row, 0).into());
-                self.tim1.set_compare_value(Channel::Ch2, self.get_val(self.row, 1).into());
-                if self.row < 8 {
-                    self.tim2.set_compare_value(Channel::Ch1, self.get_val(self.row, 8).into());
-                }
-                self.tim2.set_compare_value(Channel::Ch2, self.get_val(self.row, 6).into());
-                self.tim2.set_compare_value(Channel::Ch3, self.get_val(self.row, 3).into());
-                self.tim2.set_compare_value(Channel::Ch4, self.get_val(self.row, 4).into());
+                self.tim1.set_compare_value(Channel::Ch1, self.get_val(0).into());
+                self.tim1.set_compare_value(Channel::Ch2, self.get_val(1).into());
+                self.tim2.set_compare_value(Channel::Ch1, self.get_val(8).into());
+                self.tim2.set_compare_value(Channel::Ch2, self.get_val(6).into());
+                self.tim2.set_compare_value(Channel::Ch3, self.get_val(3).into());
+                self.tim2.set_compare_value(Channel::Ch4, self.get_val(4).into());
 
                 self.btn.set_high_all();
 
@@ -451,28 +467,39 @@ impl MatrixInterrupt {
     }
 
     fn advance(&mut self) {
+        let t = self.tim1.regs_basic().cnt().read();
         self.led.set_float_all();
 
         let measurement = self.advance_group();
 
         self.led.set_high(self.row);
 
-        if let ButtonMeasurement::Measurements(measurement, intfr) = measurement {
-        // if let ButtonMeasurement::StartTime(time) = measurement {
-        //     let mut val = time;
+        let t2 = self.tim1.regs_basic().cnt().read();
 
-            for (i, val) in measurement.0.iter().enumerate() {
-                let mut val = *val;
-                for j in 0..16 {
-                    MATRIX_FB.store(j%8, 2*i + j/8, if val&1 != 0 { 32 } else { 0 });
-                    val >>= 1;
-                }
-            }
-
-            for i in 0..4 {
-                MATRIX_FB.store(i, 8, if intfr.ccif(i) { 32 } else { 0 });
-            }
+        if let ButtonMeasurement::StartTime(t) = measurement {
+            self.last_tim_start = t;
         }
+
+        if self.row == crate::I.0.load(Ordering::Relaxed)
+            && self.next_group == if crate::I.1.load(Ordering::Relaxed) { AltGroup::NegOut } else { AltGroup::PosIn } {
+            MATRIX_FB.show_u16(0, t);
+            MATRIX_FB.show_u16(2, t2);
+        }
+
+
+        // if let ButtonMeasurement::Measurements(measurement, intfr) = measurement {
+        //     for (i, val) in measurement.0.iter().enumerate() {
+        //         let mut val = *val - self.last_tim_start;
+        //         for j in 0..16 {
+        //             MATRIX_FB.store(j%8, 2*i + j/8, if val&1 != 0 { 32 } else { 0 });
+        //             val >>= 1;
+        //         }
+        //     }
+        //
+        //     for i in 0..4 {
+        //         MATRIX_FB.store(i, 8, if intfr.ccif(i) { 32 } else { 0 });
+        //     }
+        // }
     }
 }
 
@@ -504,7 +531,9 @@ impl Matrix {
 
         tim1.set_frequency(Hertz::khz(10));
         tim2.set_frequency(Hertz::khz(10));
-        assert_eq!(tim1.get_max_compare_value(), tim2.get_max_compare_value());
+        let cycles = tim1.get_max_compare_value() + 1;
+        assert_eq!(cycles, tim2.get_max_compare_value() + 1);
+        assert!(cycles >= GAMMA_LUT[255] as u32);
 
         tim1.set_autoreload_preload(true);
         tim2.set_autoreload_preload(true);
@@ -521,18 +550,12 @@ impl Matrix {
         tim1.regs_gp16().ctlr1().modify(|w| w.set_urs(Urs::COUNTERONLY));
         tim1.enable_update_interrupt(true);
 
-        // Set capture register to -1 on counter overflow
-        // tim2.regs_gp16().ctlr1().modify(|w| w.set_capov(true));
-
         // Configure tim2 as slave of tim1 (tim1 enable also controls tim2)
         tim1.regs_gp16().ctlr2().modify(|w| w.set_mms(Mms::ENABLE));
         tim2.regs_gp16().smcfgr().modify(|w| w.set_sms(0b101));
         tim2.start();
 
         tim1.start();
-
-        let cycles = tim1.get_max_compare_value() + 1;
-        assert!(cycles >= GAMMA_LUT[255] as u32);
 
         unsafe {
             MATRIX_INT = Some(MatrixInterrupt {
@@ -541,6 +564,7 @@ impl Matrix {
                 tim1,
                 tim2,
                 cycles,
+                last_tim_start: 0,
                 row: 8,
                 next_group: AltGroup::PosIn
             });

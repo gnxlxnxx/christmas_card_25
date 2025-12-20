@@ -4,10 +4,14 @@
 
 pub mod matrix;
 
+use core::sync::atomic::{AtomicBool, AtomicU8, AtomicUsize};
+
 use panic_halt as _;
 use ch32_hal::{self as hal, delay::Delay, gpio::{Level, Output, OutputOpenDrain}, pac::{self, gpio::vals::{Cnf, Mode}, rcc::vals::{Hpre, Pllsrc, Ppre, Sw}}, timer::{Channel, low_level::{CountingMode, OutputCompareMode}}};
 
 use crate::matrix::{ButtonPins, LedPins, Matrix};
+
+static I: (AtomicUsize, AtomicBool) = (AtomicUsize::new(0), AtomicBool::new(false));
 
 #[qingke_rt::entry]
 fn main() -> ! {
@@ -20,6 +24,13 @@ fn main() -> ! {
     let matrix = Matrix::new(led, btn, p.TIM1, p.TIM2);
 
     loop {
+        for i in 0..9 {
+            I.0.store(i, core::sync::atomic::Ordering::Relaxed);
+            I.1.store(false, core::sync::atomic::Ordering::Relaxed);
+            Delay.delay_ms(1000);
+            I.1.store(true, core::sync::atomic::Ordering::Relaxed);
+            Delay.delay_ms(1000);
+        }
         Delay.delay_ms(1);
     }
 }
