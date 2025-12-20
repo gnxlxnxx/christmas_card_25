@@ -1,9 +1,6 @@
 use ch32_hal as hal;
-use core::mem;
-use embedded_hal::spi::SpiBus;
-use hal::spi::{Config, Instance, Spi, TxDma};
+use hal::spi::{Config, Spi};
 use hal::{Peri, peripherals};
-use hal::{dma, dma::Channel};
 
 use embassy_time::Timer;
 
@@ -38,15 +35,13 @@ impl Color {
         Self { r, g, b }
     }
 
-    fn to_slices_grb(&self) -> [u16; 6] {
-        let mut result: [u16; 6] = [0; 6];
+    fn to_slices_grb(&self, result: &mut [u16; 6]) {
         result[0] = BITQUARTETS[(self.g >> 4) as usize];
         result[1] = BITQUARTETS[(self.g & 0xF) as usize];
         result[2] = BITQUARTETS[(self.r >> 4) as usize];
         result[3] = BITQUARTETS[(self.r & 0xF) as usize];
         result[4] = BITQUARTETS[(self.b >> 4) as usize];
         result[5] = BITQUARTETS[(self.b & 0xF) as usize];
-        result
     }
 }
 
@@ -56,7 +51,7 @@ pub struct Ws2812<'a> {
 }
 
 impl<'a> Ws2812<'a> {
-    pub fn init(
+    pub fn new(
         pin: Peri<'static, peripherals::PC6>,
         spi1: Peri<'static, peripherals::SPI1>,
         dma1_ch3: Peri<'static, peripherals::DMA1_CH3>,
@@ -79,16 +74,13 @@ impl<'a> Ws2812<'a> {
 
     async fn start(&mut self) {
         // I have 2 leading and one trailing led full of '0's
-        let mut foo = [0; (6 + 3) * 6];
+        let mut buf = [[0u16; 6]; 6 + 3];
 
-        foo[12..18].clone_from_slice(&self.output[0].to_slices_grb());
-        foo[18..24].clone_from_slice(&self.output[1].to_slices_grb());
-        foo[24..30].clone_from_slice(&self.output[2].to_slices_grb());
-        foo[30..36].clone_from_slice(&self.output[3].to_slices_grb());
-        foo[36..42].clone_from_slice(&self.output[4].to_slices_grb());
-        foo[42..48].clone_from_slice(&self.output[5].to_slices_grb());
+        for (i, led) in (&mut buf[2..8]).into_iter().enumerate() {
+            self.output[i].to_slices_grb(led);
+        }
 
-        let _ = self.spi.write::<u16>(&foo).await;
+        let _ = self.spi.write::<u16>(&buf.as_flattened()).await;
     }
 
     pub async fn run_mode(&mut self, mode: &mut Ws2812Mode) {

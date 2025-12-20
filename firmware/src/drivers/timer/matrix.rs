@@ -25,6 +25,7 @@ const GAMMA_LUT: [u16; 256] = [
 
 pub(super) const MAX_PWM: u16 = GAMMA_LUT[255];
 pub(super) const ROWS: usize = 9;
+const DEBUG_BRIGHTNESS: u8 = 32;
 
 static FB: Framebuffer = Framebuffer::new();
 
@@ -62,7 +63,7 @@ impl Framebuffer {
     // Debug output
     pub fn show_u8(&self, y: usize, mut val: u8) {
         for i in (0..8).rev() {
-            self.store(i, y, if val & 1 != 0 { 32 } else { 0 });
+            self.store(i, y, if val & 1 != 0 { DEBUG_BRIGHTNESS } else { 0 });
             val >>= 1;
         }
     }
