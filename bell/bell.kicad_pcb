@@ -259,7 +259,7 @@
 		)
 		(fp_line
 			(start 0.93 -0.469999)
-			(end 0.930002 0.470001)
+			(end 0.930003 0.470001)
 			(stroke
 				(width 0.05)
 				(type solid)
@@ -268,7 +268,7 @@
 			(uuid "3e839745-dddd-4bdf-bf85-bd36b8517921")
 		)
 		(fp_line
-			(start -0.930002 -0.470001)
+			(start -0.930003 -0.470001)
 			(end 0.93 -0.469999)
 			(stroke
 				(width 0.05)
@@ -278,7 +278,7 @@
 			(uuid "4b482650-67fa-4328-b59d-5de4232bdd3f")
 		)
 		(fp_line
-			(start 0.930002 0.470001)
+			(start 0.930003 0.470001)
 			(end -0.93 0.469999)
 			(stroke
 				(width 0.05)
@@ -289,7 +289,7 @@
 		)
 		(fp_line
 			(start -0.93 0.469999)
-			(end -0.930002 -0.470001)
+			(end -0.930003 -0.470001)
 			(stroke
 				(width 0.05)
 				(type solid)
@@ -4640,7 +4640,7 @@
 			(net 10 "GND")
 			(pinfunction "SHIELD")
 			(pintype "passive")
-			(uuid "195fd764-e628-4b93-bf31-4994e8319ca6")
+			(uuid "0fba1c0b-666d-49ea-a333-2cab7b9a4c22")
 		)
 		(pad "S1" thru_hole oval
 			(at 5.62 -6.1)
@@ -4651,7 +4651,7 @@
 			(net 10 "GND")
 			(pinfunction "SHIELD")
 			(pintype "passive")
-			(uuid "195fd764-e628-4b93-bf31-4994e8319ca6")
+			(uuid "a11b24c0-81e3-467c-adda-ab3c10133f3c")
 		)
 		(pad "S1" thru_hole oval
 			(at 5.62 -2.1)
@@ -4662,7 +4662,7 @@
 			(net 10 "GND")
 			(pinfunction "SHIELD")
 			(pintype "passive")
-			(uuid "195fd764-e628-4b93-bf31-4994e8319ca6")
+			(uuid "5bcd6c0e-71b9-4460-b178-fc16394da561")
 		)
 		(embedded_fonts no)
 		(model "${KIPRJMOD}/bell-lib/2340901-1--3DModel-STEP-78480.STEP"
@@ -8841,7 +8841,7 @@
 		)
 		(fp_line
 			(start -0.930001 -0.469999)
-			(end 0.930001 -0.47)
+			(end 0.930002 -0.47)
 			(stroke
 				(width 0.05)
 				(type solid)
@@ -8850,7 +8850,7 @@
 			(uuid "2ffb7606-1bed-42ec-95b7-795d9be0ed37")
 		)
 		(fp_line
-			(start 0.930001 -0.47)
+			(start 0.930002 -0.47)
 			(end 0.930001 0.469999)
 			(stroke
 				(width 0.05)
@@ -8860,7 +8860,7 @@
 			(uuid "beeb227c-971a-4d0a-ab98-46050c7302ed")
 		)
 		(fp_line
-			(start -0.930001 0.47)
+			(start -0.930002 0.47)
 			(end -0.930001 -0.469999)
 			(stroke
 				(width 0.05)
@@ -8871,7 +8871,7 @@
 		)
 		(fp_line
 			(start 0.930001 0.469999)
-			(end -0.930001 0.47)
+			(end -0.930002 0.47)
 			(stroke
 				(width 0.05)
 				(type solid)
@@ -9608,7 +9608,7 @@
 			(size 0.35 0.7)
 			(layers "F.Cu" "F.Mask")
 			(net 15 "SWIO")
-			(uuid "7b83494f-a530-4ed1-9ccc-1faebad600b5")
+			(uuid "c4ea6055-b2bf-4694-8bd8-c52cbe88db22")
 		)
 		(embedded_fonts no)
 	)
@@ -17177,7 +17177,7 @@
 		)
 		(fp_poly
 			(pts
-				(xy -1.362012 -0.554998) (xy -1.56 -0.357011) (xy -1.560001 -0.752991) (xy -1.362012 -0.554998)
+				(xy -1.362012 -0.554997) (xy -1.56 -0.357011) (xy -1.560001 -0.752991) (xy -1.362012 -0.554997)
 			)
 			(stroke
 				(width 0.12)
@@ -19216,7 +19216,7 @@
 			)
 		)
 		(pad "1" smd roundrect
-			(at -0.510001 0.000002 275)
+			(at -0.510001 0.000003 275)
 			(size 0.54 0.64)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
@@ -19225,7 +19225,7 @@
 			(uuid "e16b4066-7d11-47cd-a9fe-44413fd116de")
 		)
 		(pad "2" smd roundrect
-			(at 0.510001 -0.000002 275)
+			(at 0.510001 -0.000003 275)
 			(size 0.54 0.64)
 			(layers "F.Cu" "F.Mask" "F.Paste")
 			(roundrect_rratio 0.25)
@@ -26799,7 +26799,7 @@
 		)
 		(fp_line
 			(start 0.525 -0.27)
-			(end 0.524998 0.270002)
+			(end 0.524998 0.270003)
 			(stroke
 				(width 0.1)
 				(type solid)
@@ -26808,7 +26808,7 @@
 			(uuid "75bf654e-0bd1-48a4-96bd-5f2c3cdd0169")
 		)
 		(fp_line
-			(start -0.524998 -0.270002)
+			(start -0.524998 -0.270003)
 			(end 0.525 -0.27)
 			(stroke
 				(width 0.1)
@@ -26818,7 +26818,7 @@
 			(uuid "4bc9f863-0804-4358-b187-5a511e6a6b15")
 		)
 		(fp_line
-			(start 0.524998 0.270002)
+			(start 0.524998 0.270003)
 			(end -0.525 0.27)
 			(stroke
 				(width 0.1)
@@ -26829,7 +26829,7 @@
 		)
 		(fp_line
 			(start -0.525 0.27)
-			(end -0.524998 -0.270002)
+			(end -0.524998 -0.270003)
 			(stroke
 				(width 0.1)
 				(type solid)
