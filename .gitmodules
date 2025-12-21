@@ -1,0 +1,4 @@
+[submodule "rv003usb"]
+	path = rv003usb
+	url = https://github.com/gnxlxnxx/rv003usb.git
+	branch = update-ch32fun-submodule
