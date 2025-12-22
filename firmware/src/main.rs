@@ -15,7 +15,7 @@ use drivers::{
     matrix::{self, Matrix},
 };
 
-use drivers::ws2812::Ws2812Mode;
+use util::ws2812;
 
 #[embassy_executor::task]
 async fn ws2812_exec(
@@ -25,7 +25,7 @@ async fn ws2812_exec(
 ) {
     let mut ws2812 = drivers::ws2812::Ws2812::new(pin, spi1, dma1_ch3);
 
-    let mut mode = Ws2812Mode::new();
+    let mut mode = ws2812::Mode::new();
     loop {
         ws2812.run_mode(&mut mode).await;
     }

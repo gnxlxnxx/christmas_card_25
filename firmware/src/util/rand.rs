@@ -1,5 +1,5 @@
 const NOISE_BITS: u32 = 8;
-const NOISE_MASK: u32 = ((1 << NOISE_BITS) - 1);
+const NOISE_MASK: u32 = (1 << NOISE_BITS) - 1;
 const NOISE_POLY_TAP0: u32 = 31;
 const NOISE_POLY_TAP1: u32 = 21;
 const NOISE_POLY_TAP2: u32 = 1;
