@@ -63,8 +63,8 @@ impl<'a> Ws2812<'a> {
 
         spi_config.frequency = hal::prelude::Hertz::hz(3_000_000);
 
-        let mut spi = Spi::new_txonly_nosck::<0>(spi1, pin, dma1_ch3, spi_config);
-        let mut output = [Color::new(0, 0, 0); 6];
+        let spi = Spi::new_txonly_nosck::<0>(spi1, pin, dma1_ch3, spi_config);
+        let output = [Color::new(0, 0, 0); 6];
 
         Self { spi, output }
     }
@@ -121,48 +121,45 @@ impl<'a> Ws2812<'a> {
                 Timer::after_millis(5).await;
 
                 if *counter == 300 {
-                    for ledno in 0..6 {
-                        let num_snowballs_l: u8 = snowballs[3..6]
-                            .iter()
-                            .filter(|snowball| **snowball != Color::new(0, 0, 0))
-                            .count() as u8;
-                        let num_snowballs_r: u8 = snowballs[0..3]
-                            .iter()
-                            .filter(|snowball| **snowball != Color::new(0, 0, 0))
-                            .count() as u8;
-                        let mut hue: u8 = noisegen.rand8();
-                        snowballs[0] = snowballs[1];
-                        snowballs[1] = snowballs[2];
-                        snowballs[2] = if noisegen.rand8() % (3 + num_snowballs_r) != 0 {
-                            Color::new(0, 0, 0)
-                        } else {
-                            Color::new(
-                                HUETABLE[((hue + 85) & 0xff) as usize],
-                                HUETABLE[(hue + 0) as usize],
-                                HUETABLE[((hue + 170) & 0xff) as usize],
-                            )
-                        };
+                    let num_snowballs_l: u8 = snowballs[3..6]
+                        .iter()
+                        .filter(|snowball| **snowball != Color::new(0, 0, 0))
+                        .count() as u8;
+                    let num_snowballs_r: u8 = snowballs[0..3]
+                        .iter()
+                        .filter(|snowball| **snowball != Color::new(0, 0, 0))
+                        .count() as u8;
+                    let mut hue: u8 = noisegen.rand8();
+                    snowballs[0] = snowballs[1];
+                    snowballs[1] = snowballs[2];
+                    snowballs[2] = if noisegen.rand8() % (3 + num_snowballs_r) != 0 {
+                        Color::new(0, 0, 0)
+                    } else {
+                        Color::new(
+                            HUETABLE[((hue + 85) & 0xff) as usize],
+                            HUETABLE[(hue + 0) as usize],
+                            HUETABLE[((hue + 170) & 0xff) as usize],
+                        )
+                    };
 
-                        hue = noisegen.rand8();
-                        snowballs[5] = snowballs[4];
-                        snowballs[4] = snowballs[3];
-                        snowballs[3] = if noisegen.rand8() % (3 + num_snowballs_l) != 0 {
-                            Color::new(0, 0, 0)
-                        } else {
-                            Color::new(
-                                HUETABLE[((hue + 85) & 0xff) as usize],
-                                HUETABLE[(hue + 0) as usize],
-                                HUETABLE[((hue + 170) & 0xff) as usize],
-                            )
-                        };
-                    }
+                    hue = noisegen.rand8();
+                    snowballs[5] = snowballs[4];
+                    snowballs[4] = snowballs[3];
+                    snowballs[3] = if noisegen.rand8() % (3 + num_snowballs_l) != 0 {
+                        Color::new(0, 0, 0)
+                    } else {
+                        Color::new(
+                            HUETABLE[((hue + 85) & 0xff) as usize],
+                            HUETABLE[(hue + 0) as usize],
+                            HUETABLE[((hue + 170) & 0xff) as usize],
+                        )
+                    };
                     *counter = 0;
-                } else {
-                    for ledno in 0..6 {
-                        desired_output[ledno] = snowballs[ledno];
-                    }
-                    *counter += 1;
                 }
+                for ledno in 0..6 {
+                    desired_output[ledno] = snowballs[ledno];
+                }
+                *counter += 1;
             }
 
             Ws2812Mode::Huewheel { ws2812_counter } => {
