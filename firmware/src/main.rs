@@ -5,9 +5,9 @@
 pub mod drivers;
 pub mod util;
 
-use embassy_time::{Duration, Ticker, Timer};
 use ch32_hal::{self as hal};
 use embassy_executor::Spawner;
+use embassy_time::{Duration, Ticker, Timer};
 use panic_halt as _;
 
 use drivers::{
