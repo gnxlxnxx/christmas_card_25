@@ -92,7 +92,8 @@ pub struct Pins<'a>([Peri<'a, AnyPin>; ROWS]);
 
 impl<'a> Pins<'a> {
     pub fn new(
-        led1: Peri<'a, peripherals::PD0>,
+        #[cfg(not(feature = "alternate_pins"))] led1: Peri<'a, peripherals::PD0>,
+        #[cfg(feature = "alternate_pins")] led1: Peri<'a, peripherals::PD1>,
         led2: Peri<'a, peripherals::PA2>,
         led3: Peri<'a, peripherals::PA1>,
         led4: Peri<'a, peripherals::PD6>,
@@ -102,6 +103,12 @@ impl<'a> Pins<'a> {
         led8: Peri<'a, peripherals::PC4>,
         led9: Peri<'a, peripherals::PC1>,
     ) -> Self {
+        // NOTE: this disables the SWIO and makes this a "normal" gpio!
+        #[cfg(feature = "alternate_pins")]
+        pac::AFIO.pcfr1().modify(|w| {
+            w.set_swcfg(0b100);
+        });
+
         // Set all pins high
         pac::GPIOA.bshr().write(|w| {
             w.set_bs(1, true);
@@ -113,7 +120,10 @@ impl<'a> Pins<'a> {
             w.set_bs(7, true);
         });
         pac::GPIOD.bshr().write(|w| {
+            #[cfg(not(feature = "alternate_pins"))]
             w.set_bs(0, true);
+            #[cfg(feature = "alternate_pins")]
+            w.set_bs(1, true);
             w.set_bs(2, true);
             w.set_bs(5, true);
             w.set_bs(6, true);
@@ -148,8 +158,16 @@ impl<'a> Pins<'a> {
             w.set_cnf(7, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
         });
         pac::GPIOD.cfglr().modify(|w| {
-            w.set_mode(0, Mode::INPUT);
-            w.set_cnf(0, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
+            #[cfg(not(feature = "alternate_pins"))]
+            {
+                w.set_mode(0, Mode::INPUT);
+                w.set_cnf(0, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
+            }
+            #[cfg(feature = "alternate_pins")]
+            {
+                w.set_mode(1, Mode::INPUT);
+                w.set_cnf(1, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
+            }
             w.set_mode(2, Mode::INPUT);
             w.set_cnf(2, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
             w.set_mode(5, Mode::INPUT);

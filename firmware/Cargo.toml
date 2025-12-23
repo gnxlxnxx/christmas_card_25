@@ -30,6 +30,9 @@ qingke = { version = "0.6.1", features = [ "critical-section-impl" ] }
 embedded-hal = "1.0.0"
 panic-halt = "1.0.0"
 
+[features]
+alternate_pins = [] 
+
 [profile.dev]
 opt-level = 's'
 
