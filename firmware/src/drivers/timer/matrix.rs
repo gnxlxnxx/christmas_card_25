@@ -69,6 +69,14 @@ impl Framebuffer {
         self.0[y][x].store(val, Ordering::Relaxed)
     }
 
+    pub fn store_all(&self, val: u8) {
+        for row in 0..Framebuffer::WIDTH {
+            for col in 0..Framebuffer::HEIGHT {
+                self.store(row, col, val);
+            }
+        }
+    }
+
     // Debug output
     pub fn show_u8(&self, y: usize, mut val: u8) {
         for i in (0..8).rev() {

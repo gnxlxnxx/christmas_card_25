@@ -61,7 +61,10 @@ async fn main(spawner: Spawner) -> ! {
     let mut mode = util::matrix::Mode::new();
 
     loop {
-        mode.animate().await;
+        let mut snake = util::games::snake::SnakeGame::new();
+        snake.run().await;
+
+        //mode.animate().await;
         // util::text::scroll(b"Die Fachschaft Elektro- und Informationstechnik an der \x80 Universit\xE4t Stuttgart w\xFCnscht euch allen recht herzlich ein frohes Weihnachtsfest!", 32, &mut clock).await;
         // util::text::scroll(b" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~", 32, &mut clock).await;
         // util::text::clear_scroll(&mut clock).await;
