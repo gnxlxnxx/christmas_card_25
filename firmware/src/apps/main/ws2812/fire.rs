@@ -1,6 +1,6 @@
 use crate::drivers::ws2812::Color;
 use crate::util::rand;
-use crate::util::ws2812::{HUETABLE, SINTABLE, Ws2812Mode};
+use super::{HUETABLE, SINTABLE, Ws2812Mode};
 use embassy_time::Timer;
 
 // Original "Fire" mode

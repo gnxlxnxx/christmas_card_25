@@ -1,5 +1,5 @@
 use crate::drivers::ws2812::Color;
-use crate::util::ws2812::{HUETABLE, Ws2812Mode};
+use super::{HUETABLE, Ws2812Mode};
 use embassy_time::Timer;
 
 // "Huewheel" mode

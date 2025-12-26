@@ -1,2 +1,2 @@
-mod matrix_animation;
-mod ws2812_animation;
+pub mod matrix;
+pub mod ws2812;

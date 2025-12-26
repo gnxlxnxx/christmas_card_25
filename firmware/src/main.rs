@@ -16,8 +16,8 @@ use drivers::{
     matrix::{self, Matrix},
 };
 
-use util::matrix::MatrixMode;
-use util::ws2812;
+use apps::main::matrix::MatrixMode;
+use apps::main::ws2812;
 
 #[embassy_executor::task]
 async fn ws2812_exec(
@@ -50,7 +50,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let mut clock = Ticker::every(Duration::from_millis(50));
 
-    let mut mode = util::matrix::Mode::new();
+    let mut mode = apps::main::matrix::Mode::new();
 
     loop {
         mode.animate().await;

@@ -1,5 +1,5 @@
 use crate::drivers::matrix::{Framebuffer, Matrix};
-use crate::util::matrix::MatrixMode;
+use super::MatrixMode;
 use crate::util::rand;
 use core::sync::atomic::Ordering;
 use embassy_time::Timer;

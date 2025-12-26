@@ -2,7 +2,7 @@ use ch32_hal as hal;
 use hal::spi::{Config, Spi};
 use hal::{Peri, peripherals};
 
-use crate::util::ws2812::Ws2812Mode;
+use crate::apps::main::ws2812::Ws2812Mode;
 
 use embassy_time::Timer;
 

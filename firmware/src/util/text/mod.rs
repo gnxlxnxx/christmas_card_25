@@ -43,7 +43,7 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
                 fb.store(
                     Framebuffer::WIDTH - 1,
                     base_y + downshift,
-                    if row & 1 != 0 { brightness } else { 0 },
+                    if col & 1 != 0 { brightness } else { 0 },
                 );
                 col >>= 1;
             }
