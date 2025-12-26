@@ -199,8 +199,16 @@ impl TimerDriver {
 
                 // TIM1: Enable outputs
                 self.tim1.regs_gp16().ccer().write(|w| {
-                    w.set_ccne(0, true);
-                    w.set_ccnp(0, true);
+                    #[cfg(not(feature = "alternate_pins"))]
+                    {
+                        w.set_ccne(0, true);
+                        w.set_ccnp(0, true);
+                    }
+                    #[cfg(feature = "alternate_pins")]
+                    {
+                        w.set_ccne(2, true);
+                        w.set_ccnp(2, true);
+                    }
                     w.set_ccne(1, true);
                     w.set_ccnp(1, true);
                 });
@@ -238,7 +246,10 @@ impl TimerDriver {
                 });
 
                 // Set pwm values
+                #[cfg(not(feature = "alternate_pins"))]
                 self.tim1.set_compare_value(Channel::Ch1, self.get_pwm(0));
+                #[cfg(feature = "alternate_pins")]
+                self.tim1.set_compare_value(Channel::Ch3, self.get_pwm(0));
                 self.tim1.set_compare_value(Channel::Ch2, self.get_pwm(1));
                 self.tim2.set_compare_value(Channel::Ch1, self.get_pwm(8));
                 self.tim2.set_compare_value(Channel::Ch2, self.get_pwm(6));
@@ -264,8 +275,16 @@ impl TimerDriver {
                     w.set_cnf(0, Cnf::ANALOG_IN__PUSH_PULL_OUT);
                 });
                 pac::GPIOD.cfglr().modify(|w| {
-                    w.set_mode(0, Mode::OUTPUT_50MHZ);
-                    w.set_cnf(0, Cnf::AF_OPEN_DRAIN_OUT);
+                    #[cfg(not(feature = "alternate_pins"))]
+                    {
+                        w.set_mode(0, Mode::OUTPUT_50MHZ);
+                        w.set_cnf(0, Cnf::AF_OPEN_DRAIN_OUT);
+                    }
+                    #[cfg(feature = "alternate_pins")]
+                    {
+                        w.set_mode(1, Mode::OUTPUT_50MHZ);
+                        w.set_cnf(1, Cnf::AF_OPEN_DRAIN_OUT);
+                    }
                     w.set_mode(5, Mode::OUTPUT_50MHZ);
                     w.set_cnf(5, Cnf::AF_OPEN_DRAIN_OUT);
                     w.set_mode(6, Mode::OUTPUT_50MHZ);
@@ -444,6 +463,8 @@ pub fn init(
     #[cfg(feature = "bell")]
     {
         tim1.set_output_compare_mode(Channel::Ch1, OutputCompareMode::PwmMode2);
+        #[cfg(feature = "alternate_pins")]
+        tim1.set_output_compare_mode(Channel::Ch3, OutputCompareMode::PwmMode2);
         tim1.set_output_compare_mode(Channel::Ch2, OutputCompareMode::PwmMode2);
         tim1.set_output_compare_mode(Channel::Ch4, OutputCompareMode::PwmMode2);
     }

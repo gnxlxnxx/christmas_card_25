@@ -49,7 +49,18 @@ async fn main(spawner: Spawner) -> ! {
     });
     #[cfg(feature = "bell")]
     let led = matrix::Pins::new(
-        p.PD0, p.PA2, p.PA1, p.PD6, p.PD5, p.PD2, p.PC7, p.PC4, p.PC1,
+        #[cfg(not(feature = "alternate_pins"))]
+        p.PD0,
+        #[cfg(feature = "alternate_pins")]
+        p.PD1,
+        p.PA2,
+        p.PA1,
+        p.PD6,
+        p.PD5,
+        p.PD2,
+        p.PC7,
+        p.PC4,
+        p.PC1,
     );
     #[cfg(feature = "star")]
     let led = matrix::Pins::new(p.PD2, p.PC7, p.PC4, p.PC3, p.PC2, p.PC1, p.PC0, p.PA1);

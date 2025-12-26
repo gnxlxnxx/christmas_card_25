@@ -117,7 +117,8 @@ pub struct Pins<'a>([Peri<'a, AnyPin>; COLS]);
 impl<'a> Pins<'a> {
     #[cfg(feature = "bell")]
     pub fn new(
-        led1: Peri<'a, peripherals::PD0>,
+        #[cfg(not(feature = "alternate_pins"))] led1: Peri<'a, peripherals::PD0>,
+        #[cfg(feature = "alternate_pins")] led1: Peri<'a, peripherals::PD1>,
         led2: Peri<'a, peripherals::PA2>,
         led3: Peri<'a, peripherals::PA1>,
         led4: Peri<'a, peripherals::PD6>,
@@ -127,6 +128,12 @@ impl<'a> Pins<'a> {
         led8: Peri<'a, peripherals::PC4>,
         led9: Peri<'a, peripherals::PC1>,
     ) -> Self {
+        // NOTE: this disables the SWIO and makes this a "normal" gpio!
+        #[cfg(feature = "alternate_pins")]
+        pac::AFIO.pcfr1().modify(|w| {
+            w.set_swcfg(0b100);
+        });
+
         let leds: [Peri<'a, AnyPin>; ROWS] = [
             led1.into(),
             led2.into(),
