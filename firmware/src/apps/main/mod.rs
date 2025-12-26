@@ -1,13 +1,13 @@
-use embassy_futures::select::select3;
+use embassy_futures::select::{Either, select, select3};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal, watch::Watch};
-use embassy_time::Duration;
+use embassy_time::{Duration, Ticker};
 
 use crate::drivers::{buttons::{self, Button, Buttons, Event}, ws2812::Ws2812};
 
 pub mod matrix;
 pub mod ws2812;
 
-const AUTO_DURATION: Duration = Duration::from_secs(15);
+const AUTO_DURATION: Duration = Duration::from_secs(30);
 
 pub async fn run(ws2812: &mut Ws2812<'_>) {
     let ws2812_next_signal: Signal<NoopRawMutex, ()> = Signal::new();
@@ -15,16 +15,33 @@ pub async fn run(ws2812: &mut Ws2812<'_>) {
 
     select3(
         async {
+            let mut clock = Ticker::every(AUTO_DURATION);
+            let mut auto = true;
+
             loop {
-                match Buttons::event().await {
-                    Event { button: Button::Start, pressed: true } => return,
-                    Event { button: Button::L, pressed: true } => {
-                        ws2812_next_signal.signal(());
+                match select(Buttons::event(), clock.next()).await {
+                    Either::First(ev) => match ev {
+                        Event { button: Button::Start, pressed: true } => return,
+                        Event { button: Button::Select, pressed: true } => {
+                            clock.reset();
+                            auto = true;
+                        },
+                        Event { button: Button::L, pressed: true } => {
+                            auto = false;
+                            ws2812_next_signal.signal(());
+                        },
+                        Event { button: Button::R, pressed: true } => {
+                            auto = false;
+                            matrix_next_signal.signal(());
+                        },
+                        _ => (),
                     },
-                    Event { button: Button::R, pressed: true } => {
-                        matrix_next_signal.signal(());
+                    Either::Second(()) => {
+                        if auto {
+                            ws2812_next_signal.signal(());
+                            matrix_next_signal.signal(());
+                        }
                     },
-                    _ => (),
                 }
             }
         },
