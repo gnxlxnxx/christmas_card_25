@@ -1,7 +1,9 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use ch32_hal::{Peri, pac, peripherals};
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, signal::Signal};
+use embassy_sync::{
+    blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, signal::Signal,
+};
 
 const HIST_LOW: u16 = 80;
 const HIST_HIGH: u16 = 96;
@@ -11,7 +13,7 @@ static BTN_STATE: Group<AtomicBool> = Group([
     AtomicBool::new(false),
     AtomicBool::new(false),
     AtomicBool::new(false),
-    AtomicBool::new(false)
+    AtomicBool::new(false),
 ]);
 
 pub(super) static BTN_SAMPLE_SIGNAL: Signal<CriticalSectionRawMutex, Sample> = Signal::new();
@@ -22,7 +24,7 @@ pub struct Pins<'a> {
     start: Peri<'a, peripherals::PD7>,
     select: Peri<'a, peripherals::PD4>,
     l: Peri<'a, peripherals::PC0>,
-    r: Peri<'a, peripherals::PD3>
+    r: Peri<'a, peripherals::PD3>,
 }
 
 impl<'a> Pins<'a> {
@@ -30,9 +32,14 @@ impl<'a> Pins<'a> {
         start: Peri<'a, peripherals::PD7>,
         select: Peri<'a, peripherals::PD4>,
         l: Peri<'a, peripherals::PC0>,
-        r: Peri<'a, peripherals::PD3>
+        r: Peri<'a, peripherals::PD3>,
     ) -> Self {
-        Self { start, select, l, r }
+        Self {
+            start,
+            select,
+            l,
+            r,
+        }
     }
 
     pub(super) fn set_high_all(&mut self) {
@@ -64,7 +71,7 @@ pub enum Button {
     Start = 3,
     Select = 0,
     L = 2,
-    R = 1
+    R = 1,
 }
 
 impl TryFrom<usize> for Button {
@@ -76,7 +83,7 @@ impl TryFrom<usize> for Button {
             1 => Ok(Self::R),
             2 => Ok(Self::L),
             3 => Ok(Self::Start),
-            _ => Err(())
+            _ => Err(()),
         }
     }
 }
@@ -84,7 +91,7 @@ impl TryFrom<usize> for Button {
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct Event {
     pub button: Button,
-    pub pressed: bool
+    pub pressed: bool,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Default)]
@@ -112,7 +119,7 @@ impl<T> Group<T> {
 pub(super) struct Sample {
     pub start_cnt: u16,
     pub btn_cnt: Group<u16>,
-    pub intfr: pac::timer::regs::Intfr
+    pub intfr: pac::timer::regs::Intfr,
 }
 
 #[embassy_executor::task]
@@ -123,13 +130,19 @@ pub(super) async fn process_samples() {
         let sample = BTN_SAMPLE_SIGNAL.wait().await;
         let state = BTN_STATE.each_ref().map(|s| s.load(Ordering::Relaxed));
 
-        for (ch, (((prev_state, ext_state), cnt), fcount)) in state.0.iter()
+        for (ch, (((prev_state, ext_state), cnt), fcount)) in state
+            .0
+            .iter()
             .zip(BTN_STATE.0.iter())
             .zip(sample.btn_cnt.0.iter())
             .zip(fcount.0.iter_mut())
             .enumerate()
         {
-            let lvl = if sample.intfr.ccif(ch) { cnt - sample.start_cnt } else { u16::MAX };
+            let lvl = if sample.intfr.ccif(ch) {
+                cnt - sample.start_cnt
+            } else {
+                u16::MAX
+            };
 
             *fcount = if prev_state ^ (lvl >= if *prev_state { HIST_LOW } else { HIST_HIGH }) {
                 if *fcount < FILT_LEN {
@@ -137,14 +150,18 @@ pub(super) async fn process_samples() {
                 } else {
                     let next_state = !prev_state;
                     ext_state.store(next_state, Ordering::Relaxed);
-                    BTN_EVENT_CHANNEL.send(Event {
-                        button: ch.try_into().unwrap(),
-                        pressed: next_state
-                    }).await;
+                    BTN_EVENT_CHANNEL
+                        .send(Event {
+                            button: ch.try_into().unwrap(),
+                            pressed: next_state,
+                        })
+                        .await;
 
                     0
                 }
-            } else { 0 }
+            } else {
+                0
+            }
         }
     }
 }
@@ -160,8 +177,7 @@ impl Buttons {
         BTN_EVENT_CHANNEL.receive().await
     }
 
-    pub async fn event_filtered(btn: Option<Button>, pressed: Option<bool>) -> Event
-    {
+    pub async fn event_filtered(btn: Option<Button>, pressed: Option<bool>) -> Event {
         loop {
             let event = Self::event().await;
             if btn.map_or(true, |b| b == event.button)

@@ -2,7 +2,10 @@ mod font;
 
 use embassy_time::Ticker;
 
-use crate::{drivers::matrix::{Framebuffer, Matrix}, util::text::font::Letter};
+use crate::{
+    drivers::matrix::{Framebuffer, Matrix},
+    util::text::font::Letter,
+};
 
 const DOWNSHIFT: usize = 2;
 
@@ -15,7 +18,7 @@ fn move_left(fb: &Framebuffer) {
 }
 
 pub async fn clear_scroll(clock: &mut Ticker) {
-    for _ in 0..Framebuffer::WIDTH-1 {
+    for _ in 0..Framebuffer::WIDTH - 1 {
         move_left(Matrix::fb());
         clock.next().await;
     }
@@ -31,16 +34,16 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
         for mut col in Letter::get(c).0 {
             let downshift = match Letter::downshift(col) {
                 Some(n) => n,
-                None => break
+                None => break,
             };
 
             move_left(fb);
 
-            for base_y in 0..Framebuffer::HEIGHT-2 {
+            for base_y in 0..Framebuffer::HEIGHT - 2 {
                 fb.store(
                     Framebuffer::WIDTH - 1,
                     base_y + downshift,
-                    if col & 1 != 0 { brightness } else { 0 }
+                    if row & 1 != 0 { brightness } else { 0 },
                 );
                 col >>= 1;
             }

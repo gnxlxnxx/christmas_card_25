@@ -6,9 +6,9 @@ pub mod drivers;
 pub mod util;
 pub mod apps;
 
-use embassy_time::{Duration, Ticker, Timer};
 use ch32_hal::{self as hal};
 use embassy_executor::Spawner;
+use embassy_time::{Duration, Ticker, Timer};
 use panic_halt as _;
 
 use drivers::{
@@ -16,7 +16,8 @@ use drivers::{
     matrix::{self, Matrix},
 };
 
-use drivers::ws2812::Ws2812Mode;
+use util::matrix::MatrixMode;
+use util::ws2812;
 
 #[embassy_executor::task]
 async fn ws2812_exec(
@@ -26,7 +27,7 @@ async fn ws2812_exec(
 ) {
     let mut ws2812 = drivers::ws2812::Ws2812::new(pin, spi1, dma1_ch3);
 
-    let mut mode = Ws2812Mode::new();
+    let mut mode = ws2812::Mode::new();
     loop {
         ws2812.run_mode(&mut mode).await;
     }
@@ -49,10 +50,13 @@ async fn main(spawner: Spawner) -> ! {
 
     let mut clock = Ticker::every(Duration::from_millis(50));
 
+    let mut mode = util::matrix::Mode::new();
+
     loop {
-        util::text::scroll(b"Die Fachschaft Elektro- und Informationstechnik an der \x80 Universit\xE4t Stuttgart w\xFCnscht Euch allen recht herzlich ein frohes Weihnachtsfest!", 32, &mut clock).await;
+        mode.animate().await;
+        // util::text::scroll(b"Die Fachschaft Elektro- und Informationstechnik an der \x80 Universit\xE4t Stuttgart w\xFCnscht Euch allen recht herzlich ein frohes Weihnachtsfest!", 32, &mut clock).await;
         // util::text::scroll(b" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~", 32, &mut clock).await;
-        util::text::clear_scroll(&mut clock).await;
+        // util::text::clear_scroll(&mut clock).await;
         // let event = Buttons::event().await;
         // Matrix::fb().store(3 + event.button as usize, 7, if event.pressed { 32 } else { 0 });
     }

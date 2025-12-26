@@ -10,12 +10,11 @@ time_driver_impl!(static TIME_DRIVER: TimeDriver = TimeDriver {
     queue: Mutex::new(RefCell::new(Queue::new()))
 });
 
-
 #[derive(Debug)]
 pub(super) struct TimeDriver {
     now: Mutex<Cell<u64>>,
     next: Mutex<Cell<u64>>,
-    queue: critical_section::Mutex<RefCell<Queue>>
+    queue: critical_section::Mutex<RefCell<Queue>>,
 }
 
 impl TimeDriver {
@@ -36,7 +35,7 @@ impl TimeDriver {
 
 impl Driver for TimeDriver {
     fn now(&self) -> u64 {
-        critical_section::with(|cs| self.now.borrow(cs).get() )
+        critical_section::with(|cs| self.now.borrow(cs).get())
     }
 
     fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {

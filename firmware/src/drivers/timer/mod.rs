@@ -4,19 +4,51 @@ mod time;
 
 use core::{mem::MaybeUninit, primitive::u16};
 
-use ch32_hal::{self as hal, Peri, interrupt::InterruptExt, pac::{self, gpio::vals::{Cnf, Mode}, timer::vals::{CcmrInputCcs, CcmrOutputCcs, FilterValue, Mms, Ocm, Urs}}, peripherals, time::Hertz, timer::{Channel, low_level::{CountingMode, OutputCompareMode, Timer}}};
-use embassy_executor::Spawner;
 use crate::{drivers::timer::matrix::Matrix, hal::interrupt};
+use ch32_hal::{
+    self as hal, Peri,
+    interrupt::InterruptExt,
+    pac::{
+        self,
+        gpio::vals::{Cnf, Mode},
+        timer::vals::{CcmrInputCcs, CcmrOutputCcs, FilterValue, Mms, Ocm, Urs},
+    },
+    peripherals,
+    time::Hertz,
+    timer::{
+        Channel,
+        low_level::{CountingMode, OutputCompareMode, Timer},
+    },
+};
+use embassy_executor::Spawner;
 
 static mut TIMER_DRIVER: MaybeUninit<TimerDriver> = MaybeUninit::uninit();
-
-
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]
 enum AltGroup {
     PosIn,
-    NegOut
+    NegOut,
 }
+
+///
+/// Timer usage
+///
+/// ## TIM1   
+/// | MAP  |  CH1  |  CH1N |  CH2  |  CH2N |  CH3  |  CH3N |  CH4  |   USE  |
+/// |------|-------|-------|-------|-------|-------|-------|-------|--------|
+/// |**00**|**PD2**|**PD0**|**PA1**|**PA2**|  PC3  |  PD1  |**PC4**|**LEDs**|
+/// |  01  |  PC6  |  PC3  |  PC7  |  PC4  |  PC0  |  PD1  |  PD3  |        |
+/// |  10  |  PD2  |  PD0  |  PA1  |  PA2  |  PC3  |  PD1  |  PC4  |        |
+/// |  11  |  PC4  |  PC3  |  PC7  |  PD2  |  PC5  |  PC6  |  PD4  |        |
+///
+/// ## TIM2   
+/// | MAP  |  CH1  |  CH2  |  CH3  |  CH4  |    USE    |
+/// |------|-------|-------|-------|-------|-----------|
+/// |**00**|**PD4**|**PD3**|**PC0**|**PD7**|**Buttons**|
+/// |  01  |  PD5  |  PC2  |  PD2  |  PC1  |           |
+/// |  10  |  PC1  |  PD3  |  PC0  |  PD7  |           |
+/// |**11**|**PC1**|**PC7**|**PD6**|**PD5**|  **LEDs** |
+///
 
 struct TimerDriver {
     led: matrix::Pins<'static>,
@@ -28,7 +60,7 @@ struct TimerDriver {
 
     start_cnt: u16,
     row: usize,
-    next_group: AltGroup
+    next_group: AltGroup,
 }
 
 impl TimerDriver {
@@ -39,7 +71,11 @@ impl TimerDriver {
     fn setup_next_group(&mut self) -> Option<(buttons::Group<u16>, pac::timer::regs::Intfr)> {
         match self.next_group {
             AltGroup::PosIn => {
-                self.row = if self.row < matrix::ROWS - 1 { self.row + 1 } else { 0 };
+                self.row = if self.row < matrix::ROWS - 1 {
+                    self.row + 1
+                } else {
+                    0
+                };
                 self.next_group = AltGroup::NegOut;
 
                 // TIM1: Enable outputs
@@ -128,9 +164,8 @@ impl TimerDriver {
                     self.btn.set_low_all();
                 });
 
-
                 None
-            },
+            }
 
             AltGroup::NegOut => {
                 self.next_group = AltGroup::PosIn;
@@ -140,7 +175,7 @@ impl TimerDriver {
                     self.tim2.get_capture_value(Channel::Ch1) as u16,
                     self.tim2.get_capture_value(Channel::Ch2) as u16,
                     self.tim2.get_capture_value(Channel::Ch3) as u16,
-                    self.tim2.get_capture_value(Channel::Ch4) as u16
+                    self.tim2.get_capture_value(Channel::Ch4) as u16,
                 ]);
 
                 // TIM1: Enable outputs
@@ -214,8 +249,8 @@ impl TimerDriver {
                     w.set_cnf(0, Cnf::AF_OPEN_DRAIN_OUT);
                     w.set_mode(5, Mode::OUTPUT_50MHZ);
                     w.set_cnf(5, Cnf::AF_OPEN_DRAIN_OUT);
-                    w.set_mode(6,  Mode::OUTPUT_50MHZ);
-                    w.set_cnf(6,  Cnf::AF_OPEN_DRAIN_OUT);
+                    w.set_mode(6, Mode::OUTPUT_50MHZ);
+                    w.set_cnf(6, Cnf::AF_OPEN_DRAIN_OUT);
 
                     w.set_mode(3, Mode::OUTPUT_50MHZ);
                     w.set_cnf(3, Cnf::ANALOG_IN__PUSH_PULL_OUT);
@@ -236,7 +271,11 @@ impl TimerDriver {
         self.led.set_high(self.row);
 
         if let Some((btn_cnt, intfr)) = result {
-            buttons::BTN_SAMPLE_SIGNAL.signal(buttons::Sample { start_cnt: self.start_cnt, btn_cnt, intfr });
+            buttons::BTN_SAMPLE_SIGNAL.signal(buttons::Sample {
+                start_cnt: self.start_cnt,
+                btn_cnt,
+                intfr,
+            });
         }
     }
 }
@@ -260,7 +299,7 @@ pub fn init(
     btn: buttons::Pins<'static>,
 
     tim1: Peri<'static, peripherals::TIM1>,
-    tim2: Peri<'static, peripherals::TIM2>
+    tim2: Peri<'static, peripherals::TIM2>,
 ) {
     let tim1 = Timer::new(tim1);
     let tim2 = Timer::new(tim2);
@@ -283,7 +322,9 @@ pub fn init(
     tim1.set_moe(true);
 
     // Trigger TIM1_UP interrupt on timer overflow
-    tim1.regs_gp16().ctlr1().modify(|w| w.set_urs(Urs::COUNTERONLY));
+    tim1.regs_gp16()
+        .ctlr1()
+        .modify(|w| w.set_urs(Urs::COUNTERONLY));
     tim1.enable_update_interrupt(true);
 
     // Configure tim2 as slave of tim1 (tim1 enable also controls tim2)
@@ -303,7 +344,7 @@ pub fn init(
             cycles,
             start_cnt: 0,
             row: 8,
-            next_group: AltGroup::PosIn
+            next_group: AltGroup::PosIn,
         });
 
         hal::interrupt::TIM1_UP.enable();
