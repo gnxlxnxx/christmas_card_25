@@ -1,4 +1,4 @@
-use embassy_futures::select::{Either3, Either4, select, select3, select4};
+use embassy_futures::select::{Either, Either3, Either4, select, select3, select4};
 use embassy_sync::{blocking_mutex::raw::RawMutex, signal::Signal, watch};
 use embassy_time::{Duration, Ticker, Timer};
 
@@ -60,37 +60,17 @@ impl MatrixMode for Mode {
     }
 }
 
-pub async fn run<const N: usize>(next_signal: &Signal<impl RawMutex, ()>, mut auto_receiver: watch::Receiver<'_, impl RawMutex, bool, N>) -> ! {
+pub async fn run(next_signal: &Signal<impl RawMutex, ()>) -> ! {
     let mut mode = Mode::new();
-    let mut auto = auto_receiver.get().await;
-    let mut clock = Ticker::every(Duration::MAX);
 
     loop {
-        match select4(
+        match select(
             mode.animate(),
-            next_signal.wait(),
-            auto_receiver.changed(),
-            clock.next()
+            next_signal.wait()
         ).await {
-            Either4::First(()) => {
-                if auto && mode.is_message() {
-                    clock = Ticker::every(super::AUTO_DURATION);
-                    mode.auto_next();
-                }
-            },
-            Either4::Second(()) => {
+            Either::First(()) => (),
+            Either::Second(()) => {
                 mode.next();
-            },
-            Either4::Third(new_auto) => {
-                auto = new_auto;
-                if auto {
-                    mode = Mode::new();
-                } else {
-                    clock = Ticker::every(Duration::MAX);
-                }
-            },
-            Either4::Fourth(()) => {
-                mode.auto_next();
             },
         }
     }
