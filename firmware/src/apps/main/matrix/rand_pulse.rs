@@ -17,15 +17,15 @@ pub async fn run() -> ! {
         }
         counter += 1;
 
-        for (row, matrix_row) in buffer_matrix.iter_mut().enumerate() {
-            for (col, matrix_field) in matrix_row.iter_mut().enumerate() {
-                if *matrix_field < Matrix::fb().load(col, row) {
+        for (row, buffer_row) in buffer_matrix.iter_mut().enumerate().take(Framebuffer::HEIGHT) {
+            for (col, buffer_field) in buffer_row.iter_mut().enumerate().take(Framebuffer::WIDTH) {
+                if *buffer_field < Matrix::fb().load(col, row) {
                     Matrix::fb().store(col, row, Matrix::fb().load(col, row) - 1);
-                } else if *matrix_field > Matrix::fb().load(col, row) {
+                } else if *buffer_field > Matrix::fb().load(col, row) {
                     Matrix::fb().store(col, row, Matrix::fb().load(col, row) + 1);
                 }
-                if *matrix_field == Matrix::fb().load(col, row) {
-                    *matrix_field = 0;
+                if *buffer_field == Matrix::fb().load(col, row) {
+                    *buffer_field = 0;
                 }
             }
         }

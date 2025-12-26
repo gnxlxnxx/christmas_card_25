@@ -15,8 +15,8 @@ impl Fire {
         let ticker = Ticker::every(Duration::from_millis(30));
         let mut phases: [u16; 6] = [0; 6];
         let mut noisegen = rand::WhiteNoiseGenerator::new();
-        for i in 0..6 {
-            phases[i] = (noisegen.rand8() as u16) << 7;
+        for phase in &mut phases {
+            *phase = (noisegen.rand8() as u16) << 7;
         }
         Self { ticker, phases, noisegen }
     }
