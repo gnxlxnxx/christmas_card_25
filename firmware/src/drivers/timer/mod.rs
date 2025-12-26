@@ -30,8 +30,26 @@ enum AltGroup {
     NegOut,
 }
 
+/// Star Timer usage
 ///
-/// Timer usage
+/// ## TIM1   
+/// | MAP  |  CH1  |  CH1N |  CH2  |  CH2N |  CH3  |  CH3N |  CH4  |   USE  |
+/// |------|-------|-------|-------|-------|-------|-------|-------|--------|
+/// |**00**|  PD2  |  PD0  |**PA1**|  PA2  |**PC3**|  PD1  |**PC4**|**LEDs**|
+/// |**01**|  PC6  |  PC3  |**PC7**|  PC4  |**PC0**|  PD1  |  PD3  |**LEDs**|
+/// |  10  |  PD2  |  PD0  |  PA1  |  PA2  |  PC3  |  PD1  |  PC4  |        |
+/// |  11  |  PC4  |  PC3  |  PC7  |  PD2  |  PC5  |  PC6  |  PD4  |        |
+///
+/// ## TIM2   
+/// | MAP  |  CH1  |  CH2  |  CH3  |  CH4  |   USE  |
+/// |------|-------|-------|-------|-------|--------|
+/// |  00  |  PD4  |  PD3  |  PC0  |  PD7  |        |
+/// |**01**|  PD5  |**PC2**|**PD2**|**PC1**|**LEDs**|
+/// |  10  |  PC1  |  PD3  |  PC0  |  PD7  |        |
+/// |  11  |  PC1  |  PC7  |  PD6  |  PD5  |        |
+///
+///
+/// Bell Timer usage
 ///
 /// ## TIM1   
 /// | MAP  |  CH1  |  CH1N |  CH2  |  CH2N |  CH3  |  CH3N |  CH4  |   USE  |
@@ -49,9 +67,9 @@ enum AltGroup {
 /// |  10  |  PC1  |  PD3  |  PC0  |  PD7  |           |
 /// |**11**|**PC1**|**PC7**|**PD6**|**PD5**|  **LEDs** |
 ///
-
 struct TimerDriver {
     led: matrix::Pins<'static>,
+    #[cfg(feature = "bell")]
     btn: buttons::Pins<'static>,
     tim1: Timer<'static, peripherals::TIM1>,
     tim2: Timer<'static, peripherals::TIM2>,
@@ -68,6 +86,7 @@ impl TimerDriver {
         Matrix::fb().get_pwm(col, self.row, self.cycles)
     }
 
+    #[cfg(feature = "bell")]
     fn setup_next_group(&mut self) -> Option<(buttons::Group<u16>, pac::timer::regs::Intfr)> {
         match self.next_group {
             AltGroup::PosIn => {
@@ -265,11 +284,117 @@ impl TimerDriver {
         }
     }
 
+    #[cfg(feature = "star")]
+    fn setup_next_group(&mut self) {
+        match self.next_group {
+            AltGroup::PosIn => {
+                self.row = if self.row < matrix::COLS - 1 {
+                    self.row + 1
+                } else {
+                    0
+                };
+                self.next_group = AltGroup::NegOut;
+
+                // TIM1: Select alternate mapping with leds
+                pac::AFIO.pcfr1().modify(|w| w.set_tim1_rm(0));
+
+                // TIM2: Disable outputs
+                self.tim2.regs_gp16().ccer().write(|w| {});
+
+                // TIM1: Enable outputs
+                self.tim1.regs_gp16().ccer().write(|w| {
+                    w.set_cce(1, true);
+                    w.set_ccp(1, true);
+                    w.set_cce(2, true);
+                    w.set_ccp(2, true);
+                    w.set_cce(3, true);
+                    w.set_ccp(3, true);
+                });
+
+                // Set pwm values
+                self.tim1.set_compare_value(Channel::Ch2, self.get_pwm(7));
+                self.tim1.set_compare_value(Channel::Ch3, self.get_pwm(3));
+                self.tim1.set_compare_value(Channel::Ch4, self.get_pwm(2));
+
+                // TIM1: Attach positive led pins
+                pac::GPIOA.cfglr().modify(|w| {
+                    w.set_mode(1, Mode::OUTPUT_50MHZ);
+                    w.set_cnf(1, Cnf::AF_OPEN_DRAIN_OUT);
+                });
+                pac::GPIOC.cfglr().modify(|w| {
+                    w.set_mode(3, Mode::OUTPUT_50MHZ);
+                    w.set_cnf(3, Cnf::AF_OPEN_DRAIN_OUT);
+                    w.set_mode(4, Mode::OUTPUT_50MHZ);
+                    w.set_cnf(4, Cnf::AF_OPEN_DRAIN_OUT);
+                });
+            }
+
+            AltGroup::NegOut => {
+                self.next_group = AltGroup::PosIn;
+
+                // TIM1: Select alternate mapping with leds
+                pac::AFIO.pcfr1().modify(|w| w.set_tim1_rm(1));
+
+                // TIM2: Select alternate mapping with leds
+                pac::AFIO.pcfr1().modify(|w| w.set_tim2_rm(1));
+
+                // TIM1: Enable outputs
+                self.tim1.regs_gp16().ccer().write(|w| {
+                    w.set_cce(1, true);
+                    w.set_ccp(1, true);
+                    w.set_cce(2, true);
+                    w.set_ccp(2, true);
+                });
+
+                // Set pwm values
+                self.tim1.set_compare_value(Channel::Ch2, self.get_pwm(1));
+                self.tim1.set_compare_value(Channel::Ch3, self.get_pwm(6));
+
+                // TIM2: Enable outputs
+                self.tim2.regs_gp16().ccer().write(|w| {
+                    w.set_cce(1, true);
+                    w.set_ccp(1, true);
+                    w.set_cce(2, true);
+                    w.set_ccp(2, true);
+                    w.set_cce(3, true);
+                    w.set_ccp(3, true);
+                });
+
+                // Set pwm values
+                self.tim2.set_compare_value(Channel::Ch2, self.get_pwm(4));
+                self.tim2.set_compare_value(Channel::Ch3, self.get_pwm(0));
+                self.tim2.set_compare_value(Channel::Ch4, self.get_pwm(5));
+
+                // TIM1: Attach positive led pins
+                pac::GPIOC.cfglr().modify(|w| {
+                    w.set_mode(0, Mode::OUTPUT_50MHZ);
+                    w.set_cnf(0, Cnf::AF_OPEN_DRAIN_OUT);
+                    w.set_mode(7, Mode::OUTPUT_50MHZ);
+                    w.set_cnf(7, Cnf::AF_OPEN_DRAIN_OUT);
+                });
+
+                // TIM2: Attach positive led pins
+                pac::GPIOC.cfglr().modify(|w| {
+                    w.set_mode(1, Mode::OUTPUT_50MHZ);
+                    w.set_cnf(1, Cnf::AF_OPEN_DRAIN_OUT);
+                    w.set_mode(2, Mode::OUTPUT_50MHZ);
+                    w.set_cnf(2, Cnf::AF_OPEN_DRAIN_OUT);
+                });
+
+                pac::GPIOD.cfglr().modify(|w| {
+                    w.set_mode(2, Mode::OUTPUT_50MHZ);
+                    w.set_cnf(2, Cnf::AF_OPEN_DRAIN_OUT);
+                });
+            }
+        }
+    }
+
     fn advance(&mut self) {
         self.led.set_float_all();
         let result = self.setup_next_group();
         self.led.set_high(self.row);
 
+        #[cfg(feature = "bell")]
         if let Some((btn_cnt, intfr)) = result {
             buttons::BTN_SAMPLE_SIGNAL.signal(buttons::Sample {
                 start_cnt: self.start_cnt,
@@ -296,7 +421,7 @@ pub fn init(
     spawner: Spawner,
 
     led: matrix::Pins<'static>,
-    btn: buttons::Pins<'static>,
+    #[cfg(feature = "bell")] btn: buttons::Pins<'static>,
 
     tim1: Peri<'static, peripherals::TIM1>,
     tim2: Peri<'static, peripherals::TIM2>,
@@ -316,9 +441,21 @@ pub fn init(
     tim1.set_counting_mode(CountingMode::EdgeAlignedUp);
     tim2.set_counting_mode(CountingMode::EdgeAlignedUp);
 
-    tim1.set_output_compare_mode(Channel::Ch1, OutputCompareMode::PwmMode2);
-    tim1.set_output_compare_mode(Channel::Ch2, OutputCompareMode::PwmMode2);
-    tim1.set_output_compare_mode(Channel::Ch4, OutputCompareMode::PwmMode2);
+    #[cfg(feature = "bell")]
+    {
+        tim1.set_output_compare_mode(Channel::Ch1, OutputCompareMode::PwmMode2);
+        tim1.set_output_compare_mode(Channel::Ch2, OutputCompareMode::PwmMode2);
+        tim1.set_output_compare_mode(Channel::Ch4, OutputCompareMode::PwmMode2);
+    }
+    #[cfg(feature = "star")]
+    {
+        tim1.set_output_compare_mode(Channel::Ch2, OutputCompareMode::PwmMode2);
+        tim1.set_output_compare_mode(Channel::Ch3, OutputCompareMode::PwmMode2);
+        tim1.set_output_compare_mode(Channel::Ch4, OutputCompareMode::PwmMode2);
+        tim2.set_output_compare_mode(Channel::Ch2, OutputCompareMode::PwmMode2);
+        tim2.set_output_compare_mode(Channel::Ch3, OutputCompareMode::PwmMode2);
+        tim2.set_output_compare_mode(Channel::Ch4, OutputCompareMode::PwmMode2);
+    }
     tim1.set_moe(true);
 
     // Trigger TIM1_UP interrupt on timer overflow
@@ -338,6 +475,7 @@ pub fn init(
         #[allow(static_mut_refs)]
         TIMER_DRIVER.write(TimerDriver {
             led,
+            #[cfg(feature = "bell")]
             btn,
             tim1,
             tim2,

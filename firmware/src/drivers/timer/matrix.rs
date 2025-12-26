@@ -33,7 +33,15 @@ const GAMMA_LUT: [u16; 256] = [
 ];
 
 pub(super) const MAX_PWM: u16 = GAMMA_LUT[255];
-pub(super) const ROWS: usize = 9;
+
+pub(super) const COLS: usize = 8;
+
+#[cfg(feature = "bell")]
+pub(super) const ROWS: usize = COLS + 1;
+
+#[cfg(feature = "star")]
+pub(super) const ROWS: usize = COLS - 1;
+
 const DEBUG_BRIGHTNESS: u8 = 32;
 
 static FB: Framebuffer = Framebuffer::new();
@@ -42,7 +50,7 @@ static FB: Framebuffer = Framebuffer::new();
 pub struct Framebuffer(pub [[AtomicU8; Self::WIDTH]; Self::HEIGHT]);
 
 impl Framebuffer {
-    pub const WIDTH: usize = (ROWS - 1);
+    pub const WIDTH: usize = COLS;
     pub const HEIGHT: usize = ROWS;
 
     pub const fn new() -> Self {
@@ -54,7 +62,12 @@ impl Framebuffer {
     }
 
     pub const fn from_u8_array(arr: [[u8; Self::WIDTH]; Self::HEIGHT]) -> Self {
-        Self(unsafe { mem::transmute::<[[u8; 8]; 9], [[AtomicU8; 8]; 9]>(arr) })
+        Self(unsafe {
+            mem::transmute::<
+                [[u8; Self::WIDTH]; Self::HEIGHT],
+                [[AtomicU8; Self::WIDTH]; Self::HEIGHT],
+            >(arr)
+        })
     }
 
     pub fn load(&self, x: usize, y: usize) -> u8 {
@@ -81,16 +94,28 @@ impl Framebuffer {
         self.show_u8(y + 1, val as u8);
     }
 
+    #[cfg(feature = "bell")]
     pub(super) fn get_pwm(&self, col: usize, row: usize, cycles: u32) -> u32 {
         let x = if col <= row { col } else { col - 1 };
 
         cycles - (GAMMA_LUT[self.try_load(x, row).unwrap_or(0) as usize] as u32)
     }
+
+    #[cfg(feature = "star")]
+    pub(super) fn get_pwm(&self, col: usize, row: usize, cycles: u32) -> u32 {
+        let y = if row <= col { row } else { row - 1 };
+
+        cycles - (GAMMA_LUT[self.try_load(col, y).unwrap_or(15) as usize] as u32)
+    }
 }
 
+#[cfg(feature = "bell")]
 pub struct Pins<'a>([Peri<'a, AnyPin>; ROWS]);
+#[cfg(feature = "star")]
+pub struct Pins<'a>([Peri<'a, AnyPin>; COLS]);
 
 impl<'a> Pins<'a> {
+    #[cfg(feature = "bell")]
     pub fn new(
         led1: Peri<'a, peripherals::PD0>,
         led2: Peri<'a, peripherals::PA2>,
@@ -102,24 +127,7 @@ impl<'a> Pins<'a> {
         led8: Peri<'a, peripherals::PC4>,
         led9: Peri<'a, peripherals::PC1>,
     ) -> Self {
-        // Set all pins high
-        pac::GPIOA.bshr().write(|w| {
-            w.set_bs(1, true);
-            w.set_bs(2, true);
-        });
-        pac::GPIOC.bshr().write(|w| {
-            w.set_bs(1, true);
-            w.set_bs(4, true);
-            w.set_bs(7, true);
-        });
-        pac::GPIOD.bshr().write(|w| {
-            w.set_bs(0, true);
-            w.set_bs(2, true);
-            w.set_bs(5, true);
-            w.set_bs(6, true);
-        });
-
-        Self([
+        let leds: [Peri<'a, AnyPin>; ROWS] = [
             led1.into(),
             led2.into(),
             led3.into(),
@@ -129,34 +137,57 @@ impl<'a> Pins<'a> {
             led7.into(),
             led8.into(),
             led9.into(),
-        ])
+        ];
+
+        // Set all pins high
+        for pin in &leds {
+            pac::GPIO(pin.port().into()).bshr().write(|w| {
+                w.set_bs(pin.pin().into(), true);
+            });
+        }
+
+        Self(leds)
+    }
+
+    #[cfg(feature = "star")]
+    pub fn new(
+        led1: Peri<'a, peripherals::PD2>,
+        led2: Peri<'a, peripherals::PC7>,
+        led3: Peri<'a, peripherals::PC4>,
+        led4: Peri<'a, peripherals::PC3>,
+        led5: Peri<'a, peripherals::PC2>,
+        led6: Peri<'a, peripherals::PC1>,
+        led7: Peri<'a, peripherals::PC0>,
+        led8: Peri<'a, peripherals::PA1>,
+    ) -> Self {
+        let leds: [Peri<'a, AnyPin>; COLS] = [
+            led1.into(),
+            led2.into(),
+            led3.into(),
+            led4.into(),
+            led5.into(),
+            led6.into(),
+            led7.into(),
+            led8.into(),
+        ];
+
+        // Set all pins high
+        for pin in &leds {
+            pac::GPIO(pin.port().into()).bshr().write(|w| {
+                w.set_bs(pin.pin().into(), true);
+            });
+        }
+
+        Self(leds)
     }
 
     pub(super) fn set_float_all(&mut self) {
-        pac::GPIOA.cfglr().modify(|w| {
-            w.set_mode(1, Mode::INPUT);
-            w.set_cnf(1, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
-            w.set_mode(2, Mode::INPUT);
-            w.set_cnf(2, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
-        });
-        pac::GPIOC.cfglr().modify(|w| {
-            w.set_mode(1, Mode::INPUT);
-            w.set_cnf(1, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
-            w.set_mode(4, Mode::INPUT);
-            w.set_cnf(4, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
-            w.set_mode(7, Mode::INPUT);
-            w.set_cnf(7, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
-        });
-        pac::GPIOD.cfglr().modify(|w| {
-            w.set_mode(0, Mode::INPUT);
-            w.set_cnf(0, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
-            w.set_mode(2, Mode::INPUT);
-            w.set_cnf(2, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
-            w.set_mode(5, Mode::INPUT);
-            w.set_cnf(5, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
-            w.set_mode(6, Mode::INPUT);
-            w.set_cnf(6, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
-        });
+        for pin in &self.0 {
+            pac::GPIO(pin.port().into()).cfglr().modify(|w| {
+                w.set_mode(pin.pin().into(), Mode::INPUT);
+                w.set_cnf(pin.pin().into(), Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
+            });
+        }
     }
 
     pub(super) fn set_high(&mut self, row: usize) {

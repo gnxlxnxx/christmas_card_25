@@ -1,4 +1,5 @@
 use ch32_hal as hal;
+use hal::pac;
 use hal::spi::{Config, Spi};
 use hal::{Peri, peripherals};
 
@@ -84,6 +85,12 @@ impl<'a> Ws2812<'a> {
         spi_config.frequency = hal::prelude::Hertz::hz(3_000_000);
 
         let spi = Spi::new_txonly_nosck::<0>(spi1, pin, dma1_ch3, spi_config);
+
+        #[cfg(feature = "star")]
+        pac::GPIOC.cfglr().modify(|w| {
+            w.set_cnf(6, pac::gpio::vals::Cnf::AF_OPEN_DRAIN_OUT);
+        });
+
         let output = [Color::new(0, 0, 0); 6];
 
         Self { spi, output }

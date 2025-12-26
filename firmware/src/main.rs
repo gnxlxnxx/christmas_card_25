@@ -47,11 +47,18 @@ async fn main(spawner: Spawner) -> ! {
         rcc: hal::rcc::Config::SYSCLK_FREQ_48MHZ_HSI,
         dma_interrupt_priority: qingke::interrupt::Priority::P0,
     });
+    #[cfg(feature = "bell")]
     let led = matrix::Pins::new(
         p.PD0, p.PA2, p.PA1, p.PD6, p.PD5, p.PD2, p.PC7, p.PC4, p.PC1,
     );
+    #[cfg(feature = "star")]
+    let led = matrix::Pins::new(p.PD2, p.PC7, p.PC4, p.PC3, p.PC2, p.PC1, p.PC0, p.PA1);
+    #[cfg(feature = "bell")]
     let btn = buttons::Pins::new(p.PD7, p.PD4, p.PC0, p.PD3);
+    #[cfg(feature = "bell")]
     drivers::timer_init(spawner, led, btn, p.TIM1, p.TIM2);
+    #[cfg(feature = "star")]
+    drivers::timer_init(spawner, led, p.TIM1, p.TIM2);
     spawner
         .spawn(ws2812_exec(p.PC6, p.SPI1, p.DMA1_CH3))
         .unwrap();
