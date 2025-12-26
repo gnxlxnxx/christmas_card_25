@@ -1,4 +1,5 @@
 pub mod buttons;
+
 pub mod matrix;
 mod time;
 
@@ -20,7 +21,6 @@ use ch32_hal::{
         low_level::{CountingMode, OutputCompareMode, Timer},
     },
 };
-use embassy_executor::Spawner;
 
 static mut TIMER_DRIVER: MaybeUninit<TimerDriver> = MaybeUninit::uninit();
 
@@ -59,6 +59,8 @@ struct TimerDriver {
     cycles: u32,
 
     start_cnt: u16,
+    fcount: buttons::Group<u8>,
+
     row: usize,
     next_group: AltGroup,
 }
@@ -271,11 +273,14 @@ impl TimerDriver {
         self.led.set_high(self.row);
 
         if let Some((btn_cnt, intfr)) = result {
-            buttons::BTN_SAMPLE_SIGNAL.signal(buttons::Sample {
-                start_cnt: self.start_cnt,
-                btn_cnt,
-                intfr,
-            });
+            buttons::process_samples(
+                buttons::Sample {
+                    start_cnt: self.start_cnt,
+                    btn_cnt,
+                    intfr,
+                },
+                &mut self.fcount,
+            );
         }
     }
 }
@@ -293,8 +298,6 @@ fn TIM1_UP() {
 }
 
 pub fn init(
-    spawner: Spawner,
-
     led: matrix::Pins<'static>,
     btn: buttons::Pins<'static>,
 
@@ -339,14 +342,16 @@ pub fn init(
             btn,
             tim1,
             tim2,
+
             cycles,
+
             start_cnt: 0,
+            fcount: buttons::Group::default(),
+
             row: 8,
             next_group: AltGroup::PosIn,
         });
 
         hal::interrupt::TIM1_UP.enable();
     }
-
-    spawner.spawn(buttons::process_samples()).unwrap();
 }

@@ -1,9 +1,7 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
 use ch32_hal::{Peri, pac, peripherals};
-use embassy_sync::{
-    blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel, signal::Signal,
-};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
 
 const HIST_LOW: u16 = 80;
 const HIST_HIGH: u16 = 96;
@@ -16,7 +14,7 @@ static BTN_STATE: Group<AtomicBool> = Group([
     AtomicBool::new(false),
 ]);
 
-pub(super) static BTN_SAMPLE_SIGNAL: Signal<CriticalSectionRawMutex, Sample> = Signal::new();
+// pub(super) static BTN_SAMPLE_SIGNAL: Signal<CriticalSectionRawMutex, Sample> = Signal::new();
 static BTN_EVENT_CHANNEL: Channel<CriticalSectionRawMutex, Event, 3> = Channel::new();
 
 #[derive(Debug)]
@@ -117,44 +115,36 @@ pub(super) struct Sample {
     pub intfr: pac::timer::regs::Intfr,
 }
 
-#[embassy_executor::task]
-pub(super) async fn process_samples() {
-    let mut fcount = Group::<u8>::default();
+pub(super) fn process_samples(sample: Sample, fcount: &mut Group<u8>) {
+    let state = BTN_STATE.each_ref().map(|s| s.load(Ordering::Relaxed));
 
-    loop {
-        let sample = BTN_SAMPLE_SIGNAL.wait().await;
-        let state = BTN_STATE.each_ref().map(|s| s.load(Ordering::Relaxed));
+    for (ch, (((prev_state, ext_state), cnt), fcount)) in state.0.iter()
+        .zip(BTN_STATE.0.iter())
+        .zip(sample.btn_cnt.0.iter())
+        .zip(fcount.0.iter_mut())
+        .enumerate()
+    {
+        let lvl = if sample.intfr.ccif(ch) {
+            cnt - sample.start_cnt
+        } else {
+            u16::MAX
+        };
 
-        for (ch, (((prev_state, ext_state), cnt), fcount)) in state.0.iter()
-            .zip(BTN_STATE.0.iter())
-            .zip(sample.btn_cnt.0.iter())
-            .zip(fcount.0.iter_mut())
-            .enumerate()
-        {
-            let lvl = if sample.intfr.ccif(ch) {
-                cnt - sample.start_cnt
+        *fcount = if prev_state ^ (lvl >= if *prev_state { HIST_LOW } else { HIST_HIGH }) {
+            if *fcount < FILT_LEN {
+                *fcount + 1
             } else {
-                u16::MAX
-            };
+                let next_state = !prev_state;
+                ext_state.store(next_state, Ordering::Relaxed);
+                let _ = BTN_EVENT_CHANNEL.try_send(Event {
+                    button: ch.try_into().unwrap(),
+                    pressed: next_state,
+                });
 
-            *fcount = if prev_state ^ (lvl >= if *prev_state { HIST_LOW } else { HIST_HIGH }) {
-                if *fcount < FILT_LEN {
-                    *fcount + 1
-                } else {
-                    let next_state = !prev_state;
-                    ext_state.store(next_state, Ordering::Relaxed);
-                    BTN_EVENT_CHANNEL
-                        .send(Event {
-                            button: ch.try_into().unwrap(),
-                            pressed: next_state,
-                        })
-                        .await;
-
-                    0
-                }
-            } else {
                 0
             }
+        } else {
+            0
         }
     }
 }
