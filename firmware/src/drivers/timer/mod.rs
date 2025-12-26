@@ -322,9 +322,7 @@ pub fn init(
     tim1.set_moe(true);
 
     // Trigger TIM1_UP interrupt on timer overflow
-    tim1.regs_gp16()
-        .ctlr1()
-        .modify(|w| w.set_urs(Urs::COUNTERONLY));
+    tim1.regs_gp16().ctlr1().modify(|w| w.set_urs(Urs::COUNTERONLY));
     tim1.enable_update_interrupt(true);
 
     // Configure tim2 as slave of tim1 (tim1 enable also controls tim2)

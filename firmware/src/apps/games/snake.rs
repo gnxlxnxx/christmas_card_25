@@ -11,20 +11,20 @@ enum Direction {
     Up,
     Right,
     Down,
-    Left
+    Left,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum FieldState {
     Empty,
     Snake(Direction),
-    Maultasch
+    Maultasch,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 struct Coordinate {
     x: usize,
-    y: usize
+    y: usize,
 }
 
 impl Coordinate {
@@ -43,15 +43,18 @@ impl Field {
 
     fn set(&mut self, c: Coordinate, state: FieldState) {
         self.0[c.y][c.x] = state;
-        Matrix::fb().store(c.x, c.y, match state {
-            FieldState::Empty => 0,
-            FieldState::Snake(_) => HEAD_BRIGHTNESS,
-            FieldState::Maultasch => MAULTASCH_BRIGHTNESS
-        });
+        Matrix::fb().store(
+            c.x,
+            c.y,
+            match state {
+                FieldState::Empty => 0,
+                FieldState::Snake(_) => HEAD_BRIGHTNESS,
+                FieldState::Maultasch => MAULTASCH_BRIGHTNESS,
+            },
+        );
     }
 
-    fn gen_maultasch(&mut self) {
-    }
+    fn gen_maultasch(&mut self) {}
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -63,7 +66,7 @@ struct Game {
     length_increase: u8,
     score: u8,
     head: Coordinate,
-    tail: Coordinate
+    tail: Coordinate,
 }
 
 impl Game {

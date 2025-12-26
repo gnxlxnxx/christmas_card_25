@@ -2,9 +2,9 @@
 #![no_main]
 #![feature(type_alias_impl_trait)]
 
+pub mod apps;
 pub mod drivers;
 pub mod util;
-pub mod apps;
 
 use ch32_hal::{self as hal};
 use embassy_executor::Spawner;

@@ -34,12 +34,7 @@ impl<'a> Pins<'a> {
         l: Peri<'a, peripherals::PC0>,
         r: Peri<'a, peripherals::PD3>,
     ) -> Self {
-        Self {
-            start,
-            select,
-            l,
-            r,
-        }
+        Self { start, select, l, r }
     }
 
     pub(super) fn set_high_all(&mut self) {
@@ -130,9 +125,7 @@ pub(super) async fn process_samples() {
         let sample = BTN_SAMPLE_SIGNAL.wait().await;
         let state = BTN_STATE.each_ref().map(|s| s.load(Ordering::Relaxed));
 
-        for (ch, (((prev_state, ext_state), cnt), fcount)) in state
-            .0
-            .iter()
+        for (ch, (((prev_state, ext_state), cnt), fcount)) in state.0.iter()
             .zip(BTN_STATE.0.iter())
             .zip(sample.btn_cnt.0.iter())
             .zip(fcount.0.iter_mut())
@@ -150,12 +143,10 @@ pub(super) async fn process_samples() {
                 } else {
                     let next_state = !prev_state;
                     ext_state.store(next_state, Ordering::Relaxed);
-                    BTN_EVENT_CHANNEL
-                        .send(Event {
-                            button: ch.try_into().unwrap(),
-                            pressed: next_state,
-                        })
-                        .await;
+                    BTN_EVENT_CHANNEL.send(Event {
+                        button: ch.try_into().unwrap(),
+                        pressed: next_state,
+                    }).await;
 
                     0
                 }
