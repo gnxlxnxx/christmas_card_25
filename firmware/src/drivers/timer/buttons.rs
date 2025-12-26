@@ -167,15 +167,4 @@ impl Buttons {
     pub async fn event() -> Event {
         BTN_EVENT_CHANNEL.receive().await
     }
-
-    pub async fn event_filtered(btn: Option<Button>, pressed: Option<bool>) -> Event {
-        loop {
-            let event = Self::event().await;
-            if btn.map_or(true, |b| b == event.button)
-                && pressed.map_or(true, |p| p == event.pressed)
-            {
-                return event;
-            }
-        }
-    }
 }

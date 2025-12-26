@@ -1,10 +1,11 @@
 use crate::drivers::ws2812::Color;
 use crate::util::rand;
 use super::{HUETABLE, Ws2812Mode};
-use embassy_time::Timer;
+use embassy_time::{Duration, Ticker, Timer};
 
 // "Snowball" mode
 pub struct Snowball {
+    ticker: Ticker,
     counter: u32,
     snowballs: [Color; 6],
     noisegen: rand::WhiteNoiseGenerator,
@@ -12,13 +13,11 @@ pub struct Snowball {
 
 impl Snowball {
     pub fn new() -> Self {
-        let counter = 0;
-        let snowballs: [Color; 6] = [Color::new(0, 0, 0); 6];
-        let noisegen = rand::WhiteNoiseGenerator::new();
         Self {
-            counter,
-            snowballs,
-            noisegen,
+            ticker: Ticker::every(Duration::from_millis(5)),
+            counter: 0,
+            snowballs: [Color::new(0, 0, 0); 6],
+            noisegen: rand::WhiteNoiseGenerator::new(),
         }
     }
 }

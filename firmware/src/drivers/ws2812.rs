@@ -2,10 +2,6 @@ use ch32_hal as hal;
 use hal::spi::{Config, Spi};
 use hal::{Peri, peripherals};
 
-use crate::apps::main::ws2812::Ws2812Mode;
-
-use embassy_time::Timer;
-
 const BITQUARTETS: [u16; 16] = [
     0b1000100010001000,
     0b1000100010001110,
@@ -37,16 +33,7 @@ impl Color {
         Self { r, g, b }
     }
 
-    fn to_slices_grb(&self, result: &mut [u16; 6]) {
-        result[0] = BITQUARTETS[(self.g >> 4) as usize];
-        result[1] = BITQUARTETS[(self.g & 0xF) as usize];
-        result[2] = BITQUARTETS[(self.r >> 4) as usize];
-        result[3] = BITQUARTETS[(self.r & 0xF) as usize];
-        result[4] = BITQUARTETS[(self.b >> 4) as usize];
-        result[5] = BITQUARTETS[(self.b & 0xF) as usize];
-    }
-
-    fn transition(&mut self, desired_value: Self) {
+    pub fn transition(&mut self, desired_value: Self) {
         if self.r > desired_value.r {
             self.r -= 1;
         } else if self.r < desired_value.r {
@@ -65,11 +52,19 @@ impl Color {
             self.b += 1;
         }
     }
+
+    fn to_slices_grb(&self, result: &mut [u16; 6]) {
+        result[0] = BITQUARTETS[(self.g >> 4) as usize];
+        result[1] = BITQUARTETS[(self.g & 0xF) as usize];
+        result[2] = BITQUARTETS[(self.r >> 4) as usize];
+        result[3] = BITQUARTETS[(self.r & 0xF) as usize];
+        result[4] = BITQUARTETS[(self.b >> 4) as usize];
+        result[5] = BITQUARTETS[(self.b & 0xF) as usize];
+    }
 }
 
 pub struct Ws2812<'a> {
     spi: Spi<'a, peripherals::SPI1, ch32_hal::mode::Async>,
-    output: [Color; 6],
 }
 
 impl<'a> Ws2812<'a> {
@@ -84,34 +79,18 @@ impl<'a> Ws2812<'a> {
         spi_config.frequency = hal::prelude::Hertz::hz(3_000_000);
 
         let spi = Spi::new_txonly_nosck::<0>(spi1, pin, dma1_ch3, spi_config);
-        let output = [Color::new(0, 0, 0); 6];
 
-        Self { spi, output }
+        Self { spi }
     }
 
-    pub async fn set_colors(&mut self, colors: [Color; 6]) {
-        self.output = colors;
-        self.start().await;
-    }
-
-    async fn start(&mut self) {
+    pub async fn write(&mut self, colors: &[Color; 6]) {
         // I have 2 leading and one trailing led full of '0's
         let mut buf = [[0u16; 6]; 6 + 3];
 
-        for (i, led) in (&mut buf[2..8]).into_iter().enumerate() {
-            self.output[i].to_slices_grb(led);
+        for (signal, color) in buf[2..8].iter_mut().zip(colors) {
+            color.to_slices_grb(signal);
         }
 
         let _ = self.spi.write::<u16>(&buf.as_flattened()).await;
-    }
-
-    pub async fn run_mode<T: Ws2812Mode>(&mut self, mode: &mut T) {
-        let mut desired_output: [Color; 6] = mode.animate().await;
-
-        for (led, value) in self.output.iter_mut().zip(desired_output) {
-            led.transition(value);
-        }
-
-        self.start().await;
     }
 }

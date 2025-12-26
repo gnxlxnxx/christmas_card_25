@@ -2,9 +2,10 @@ use crate::drivers::matrix::{Framebuffer, Matrix};
 use super::MatrixMode;
 use crate::util::rand;
 use core::sync::atomic::Ordering;
-use embassy_time::Timer;
+use embassy_time::{Duration, Ticker, Timer};
 
 pub struct RandPulse {
+    ticker: Ticker,
     counter: u8,
     buffer_matrix: [[u8; Framebuffer::WIDTH]; Framebuffer::HEIGHT],
     noisegen: rand::WhiteNoiseGenerator,
@@ -12,15 +13,11 @@ pub struct RandPulse {
 
 impl RandPulse {
     pub fn new() -> Self {
-        let noisegen = rand::WhiteNoiseGenerator::new();
-        let counter = 0;
-        let buffer_matrix: [[u8; Framebuffer::WIDTH]; Framebuffer::HEIGHT] =
-            [[0; Framebuffer::WIDTH]; Framebuffer::HEIGHT];
-
         Self {
-            noisegen,
-            buffer_matrix,
-            counter,
+            ticker: Ticker::every(Duration::from_millis(10)),
+            counter: 0,
+            buffer_matrix: [[0; Framebuffer::WIDTH]; Framebuffer::HEIGHT],
+            noisegen: rand::WhiteNoiseGenerator::new(),
         }
     }
 }
@@ -47,6 +44,6 @@ impl MatrixMode for RandPulse {
                 }
             }
         }
-        Timer::after_millis(10).await;
+        self.ticker.next().await;
     }
 }

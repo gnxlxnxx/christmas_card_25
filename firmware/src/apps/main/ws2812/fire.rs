@@ -1,28 +1,30 @@
 use crate::drivers::ws2812::Color;
 use crate::util::rand;
 use super::{HUETABLE, SINTABLE, Ws2812Mode};
-use embassy_time::Timer;
+use embassy_time::{Duration, Ticker, Timer};
 
 // Original "Fire" mode
 pub struct Fire {
+    ticker: Ticker,
     phases: [u16; 6],
     noisegen: rand::WhiteNoiseGenerator,
 }
 
 impl Fire {
     pub fn new() -> Self {
+        let ticker = Ticker::every(Duration::from_millis(30));
         let mut phases: [u16; 6] = [0; 6];
         let mut noisegen = rand::WhiteNoiseGenerator::new();
         for i in 0..6 {
             phases[i] = (noisegen.rand8() as u16) << 7;
         }
-        Self { phases, noisegen }
+        Self { ticker, phases, noisegen }
     }
 }
 
 impl Ws2812Mode for Fire {
     async fn animate(&mut self) -> [Color; 6] {
-        Timer::after_millis(30).await;
+        self.ticker.next().await;
 
         let mut desired_output: [Color; 6] = [Color::new(0, 0, 0); 6];
 

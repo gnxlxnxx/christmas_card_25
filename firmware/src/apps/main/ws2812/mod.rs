@@ -1,4 +1,10 @@
-use crate::drivers::ws2812::Color;
+use core::future::pending;
+
+use embassy_futures::select::{Either, Either3, Either4, select, select3, select4};
+use embassy_sync::{blocking_mutex::raw::RawMutex, signal::Signal, watch};
+use embassy_time::{Duration, Ticker, Timer};
+
+use crate::drivers::ws2812::{Color, Ws2812};
 
 pub mod fire;
 pub mod huewheel;
@@ -34,6 +40,49 @@ impl Ws2812Mode for Mode {
             Self::Fire(a) => a.animate().await,
             Self::Snowball(a) => a.animate().await,
             Self::Huewheel(a) => a.animate().await,
+        }
+    }
+}
+
+pub async fn run<const N: usize>(ws2812: &mut Ws2812<'_>, next_signal: &Signal<impl RawMutex, ()>, mut auto_receiver: watch::Receiver<'_, impl RawMutex, bool, N>) -> ! {
+    let mut mode = Mode::new();
+    let mut clock = Ticker::every(
+        if auto_receiver.get().await {
+            super::AUTO_DURATION
+        } else {
+            Duration::MAX
+        }
+    );
+    let mut output = [Color::new(0, 0, 0); 6];
+
+    loop {
+        match select4(
+            mode.animate(),
+            next_signal.wait(),
+            auto_receiver.changed(),
+            clock.next()
+        ).await {
+            Either4::First(desired_output) => {
+                for (current, desired) in output.iter_mut().zip(desired_output) {
+                    current.transition(desired);
+                }
+
+                ws2812.write(&output).await;
+            },
+            Either4::Second(()) => {
+                mode.next();
+            },
+            Either4::Third(auto) => {
+                if auto {
+                    clock = Ticker::every(super::AUTO_DURATION);
+                    mode = Mode::new();
+                } else {
+                    clock = Ticker::every(Duration::MAX);
+                }
+            },
+            Either4::Fourth(()) => {
+                mode.next();
+            },
         }
     }
 }

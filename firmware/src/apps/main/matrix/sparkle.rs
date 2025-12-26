@@ -2,18 +2,21 @@ use crate::drivers::matrix::{Framebuffer, Matrix};
 use super::MatrixMode;
 use crate::util::rand;
 use core::sync::atomic::Ordering;
-use embassy_time::Timer;
+use embassy_time::{Duration, Ticker, Timer};
 
 pub struct Sparkle {
+    ticker: Ticker,
     counter: u32,
     noisegen: rand::WhiteNoiseGenerator,
 }
 
 impl Sparkle {
     pub fn new() -> Self {
-        let noisegen = rand::WhiteNoiseGenerator::new();
-        let counter = 0;
-        Self { noisegen, counter }
+        Self {
+            ticker: Ticker::every(Duration::from_millis(10)),
+            counter: 0,
+            noisegen: rand::WhiteNoiseGenerator::new(),
+        }
     }
 }
 
@@ -34,6 +37,6 @@ impl MatrixMode for Sparkle {
             self.counter = 0;
         }
         self.counter += 1;
-        Timer::after_millis(10).await;
+        self.ticker.next().await;
     }
 }
