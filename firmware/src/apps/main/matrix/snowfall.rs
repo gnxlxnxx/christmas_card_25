@@ -8,20 +8,10 @@ use embassy_time::Timer;
 // - Wind
 // - Make fall timing more random
 
-pub struct Snowfall {
-    noisegen: rand::WhiteNoiseGenerator,
-}
+pub async fn run() -> ! {
+    let mut noisegen = rand::WhiteNoiseGenerator::new();
 
-impl Snowfall {
-    pub fn new() -> Self {
-        let noisegen = rand::WhiteNoiseGenerator::new();
-
-        Self { noisegen }
-    }
-}
-
-impl MatrixMode for Snowfall {
-    async fn animate(&mut self) {
+    loop {
         let bottom_full: bool = Matrix::fb().0[Framebuffer::HEIGHT - 1]
             .iter()
             .filter(|col| (**col).load(Ordering::Relaxed) == 0)
@@ -44,7 +34,7 @@ impl MatrixMode for Snowfall {
             for row in (1..(Framebuffer::HEIGHT - 1)).rev() {
                 Matrix::fb().store(col, row, Matrix::fb().load(col, row - 1));
             }
-            Matrix::fb().store(col, 0, if self.noisegen.rand8() > 240 { 127 } else { 0 });
+            Matrix::fb().store(col, 0, if noisegen.rand8() > 240 { 127 } else { 0 });
         }
         Timer::after_millis(1000).await;
     }

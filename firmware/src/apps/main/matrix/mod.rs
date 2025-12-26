@@ -13,9 +13,9 @@ trait MatrixMode {
 
 enum Mode {
     Message,
-    Snowfall(snowfall::Snowfall),
-    Sparkle(sparkle::Sparkle),
-    RandPulse(rand_pulse::RandPulse),
+    Snowfall,
+    Sparkle,
+    RandPulse,
 }
 
 impl Mode {
@@ -25,26 +25,10 @@ impl Mode {
 
     pub fn next(&mut self) {
         *self = match self {
-            Self::Message => Self::Snowfall(snowfall::Snowfall::new()),
-            Self::Snowfall(_) => Self::Sparkle(sparkle::Sparkle::new()),
-            Self::Sparkle(_) => Self::RandPulse(rand_pulse::RandPulse::new()),
-            Self::RandPulse(_) => Self::Message,
-        }
-    }
-
-    pub fn auto_next(&mut self) {
-        *self = match self {
-            Self::Message => Self::Snowfall(snowfall::Snowfall::new()),
-            Self::Snowfall(_) => Self::Sparkle(sparkle::Sparkle::new()),
-            Self::Sparkle(_) => Self::RandPulse(rand_pulse::RandPulse::new()),
-            Self::RandPulse(_) => Self::Snowfall(snowfall::Snowfall::new()),
-        }
-    }
-
-    pub fn is_message(&self) -> bool {
-        match self {
-            Self::Message => true,
-            _ => false,
+            Self::Message => Self::Snowfall,
+            Self::Snowfall => Self::Sparkle,
+            Self::Sparkle => Self::RandPulse,
+            Self::RandPulse => Self::Message,
         }
     }
 }
@@ -53,9 +37,9 @@ impl MatrixMode for Mode {
     async fn animate(&mut self) {
         match self {
             Self::Message => message::run().await,
-            Self::Sparkle(a) => a.animate().await,
-            Self::Snowfall(a) => a.animate().await,
-            Self::RandPulse(a) => a.animate().await,
+            Self::Sparkle => sparkle::run().await,
+            Self::Snowfall => snowfall::run().await,
+            Self::RandPulse => rand_pulse::run().await,
         }
     }
 }
@@ -64,14 +48,8 @@ pub async fn run(next_signal: &Signal<impl RawMutex, ()>) -> ! {
     let mut mode = Mode::new();
 
     loop {
-        match select(
-            mode.animate(),
-            next_signal.wait()
-        ).await {
-            Either::First(()) => (),
-            Either::Second(()) => {
-                mode.next();
-            },
+        if select(mode.animate(), next_signal.wait()).await.is_second() {
+            mode.next();
         }
     }
 }
