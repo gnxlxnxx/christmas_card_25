@@ -1,5 +1,3 @@
-use core::iter::Empty;
-
 use crate::drivers::matrix::{Framebuffer, Matrix};
 
 const HEAD_BRIGHTNESS: u8 = 64;
@@ -78,8 +76,14 @@ impl Game {
             length: 1,
             length_increase: 1,
             score: 0,
-            head: Coordinate { x: 0, y: Framebuffer::HEIGHT / 2 },
-            tail: Coordinate { x: 0, y: Framebuffer::HEIGHT / 2 }
+            head: Coordinate {
+                x: 0,
+                y: Framebuffer::HEIGHT / 2,
+            },
+            tail: Coordinate {
+                x: 0,
+                y: Framebuffer::HEIGHT / 2,
+            },
         };
 
         fb.clear_all();

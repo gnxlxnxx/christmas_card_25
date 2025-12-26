@@ -1,8 +1,6 @@
 use crate::drivers::matrix::{Framebuffer, Matrix};
-use super::MatrixMode;
 use crate::util::rand;
-use core::sync::atomic::Ordering;
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_time::{Duration, Ticker};
 
 pub async fn run() {
     let mut ticker = Ticker::every(Duration::from_millis(10));

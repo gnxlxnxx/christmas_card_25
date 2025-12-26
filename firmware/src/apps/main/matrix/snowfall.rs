@@ -1,5 +1,4 @@
 use crate::drivers::matrix::{Framebuffer, Matrix};
-use super::MatrixMode;
 use crate::util::rand;
 use core::sync::atomic::Ordering;
 use embassy_time::Timer;
@@ -14,8 +13,7 @@ pub async fn run() -> ! {
     loop {
         let bottom_full: bool = Matrix::fb().0[Framebuffer::HEIGHT - 1]
             .iter()
-            .filter(|col| (**col).load(Ordering::Relaxed) == 0)
-            .next()
+            .find(|col| (**col).load(Ordering::Relaxed) == 0)
             .is_none();
 
         if bottom_full {

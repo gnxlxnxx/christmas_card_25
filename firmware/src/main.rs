@@ -8,15 +8,12 @@ pub mod util;
 
 use ch32_hal::{self as hal};
 use embassy_executor::Spawner;
-use embassy_time::{Duration, Ticker, Timer};
 use panic_halt as _;
 
 use drivers::{
-    buttons::{self, Buttons},
-    matrix::{self, Matrix},
+    buttons::{self},
+    matrix::{self},
 };
-
-use apps::main::ws2812;
 
 use crate::apps::main;
 

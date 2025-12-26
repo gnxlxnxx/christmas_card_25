@@ -53,7 +53,7 @@ impl Color {
         }
     }
 
-    fn to_slices_grb(&self, result: &mut [u16; 6]) {
+    fn gen_grb_data(&self, result: &mut [u16; 6]) {
         result[0] = BITQUARTETS[(self.g >> 4) as usize];
         result[1] = BITQUARTETS[(self.g & 0xF) as usize];
         result[2] = BITQUARTETS[(self.r >> 4) as usize];
@@ -88,9 +88,9 @@ impl<'a> Ws2812<'a> {
         let mut buf = [[0u16; 6]; 6 + 3];
 
         for (signal, color) in buf[2..8].iter_mut().zip(colors) {
-            color.to_slices_grb(signal);
+            color.gen_grb_data(signal);
         }
 
-        let _ = self.spi.write::<u16>(&buf.as_flattened()).await;
+        let _ = self.spi.write::<u16>(buf.as_flattened()).await;
     }
 }

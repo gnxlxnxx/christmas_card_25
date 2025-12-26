@@ -1,11 +1,10 @@
+use super::{HUETABLE, Ws2812Mode};
 use crate::drivers::ws2812::Color;
 use crate::util::rand;
-use super::{HUETABLE, Ws2812Mode};
 use embassy_time::{Duration, Ticker, Timer};
 
 // "Snowball" mode
 pub struct Snowball {
-    ticker: Ticker,
     counter: u32,
     snowballs: [Color; 6],
     noisegen: rand::WhiteNoiseGenerator,
@@ -14,7 +13,6 @@ pub struct Snowball {
 impl Snowball {
     pub fn new() -> Self {
         Self {
-            ticker: Ticker::every(Duration::from_millis(5)),
             counter: 0,
             snowballs: [Color::new(0, 0, 0); 6],
             noisegen: rand::WhiteNoiseGenerator::new(),
@@ -38,26 +36,26 @@ impl Ws2812Mode for Snowball {
             let mut hue: u8 = self.noisegen.rand8();
             self.snowballs[0] = self.snowballs[1];
             self.snowballs[1] = self.snowballs[2];
-            self.snowballs[2] = if self.noisegen.rand8() % (3 + num_snowballs_r) != 0 {
+            self.snowballs[2] = if !self.noisegen.rand8().is_multiple_of(3 + num_snowballs_r) {
                 Color::new(0, 0, 0)
             } else {
                 Color::new(
-                    HUETABLE[((hue + 85) & 0xff) as usize],
-                    HUETABLE[(hue + 0) as usize],
-                    HUETABLE[((hue + 170) & 0xff) as usize],
+                    HUETABLE[hue.wrapping_add(85) as usize],
+                    HUETABLE[hue as usize],
+                    HUETABLE[hue.wrapping_add(170) as usize],
                 )
             };
 
             hue = self.noisegen.rand8();
             self.snowballs[5] = self.snowballs[4];
             self.snowballs[4] = self.snowballs[3];
-            self.snowballs[3] = if self.noisegen.rand8() % (3 + num_snowballs_l) != 0 {
+            self.snowballs[3] = if !self.noisegen.rand8().is_multiple_of(3 + num_snowballs_l) {
                 Color::new(0, 0, 0)
             } else {
                 Color::new(
-                    HUETABLE[((hue + 85) & 0xff) as usize],
-                    HUETABLE[(hue + 0) as usize],
-                    HUETABLE[((hue + 170) & 0xff) as usize],
+                    HUETABLE[hue.wrapping_add(85) as usize],
+                    HUETABLE[hue as usize],
+                    HUETABLE[hue.wrapping_add(170) as usize],
                 )
             };
             self.counter = 0;

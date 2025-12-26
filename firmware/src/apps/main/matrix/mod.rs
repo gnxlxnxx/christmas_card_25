@@ -1,6 +1,5 @@
-use embassy_futures::select::{Either, Either3, Either4, select, select3, select4};
-use embassy_sync::{blocking_mutex::raw::RawMutex, signal::Signal, watch};
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_futures::select::select;
+use embassy_sync::{blocking_mutex::raw::RawMutex, signal::Signal};
 
 mod message;
 mod rand_pulse;

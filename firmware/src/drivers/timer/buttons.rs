@@ -143,10 +143,12 @@ pub(super) async fn process_samples() {
                 } else {
                     let next_state = !prev_state;
                     ext_state.store(next_state, Ordering::Relaxed);
-                    BTN_EVENT_CHANNEL.send(Event {
-                        button: ch.try_into().unwrap(),
-                        pressed: next_state,
-                    }).await;
+                    BTN_EVENT_CHANNEL
+                        .send(Event {
+                            button: ch.try_into().unwrap(),
+                            pressed: next_state,
+                        })
+                        .await;
 
                     0
                 }

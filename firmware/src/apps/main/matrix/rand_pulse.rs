@@ -1,8 +1,6 @@
 use crate::drivers::matrix::{Framebuffer, Matrix};
-use super::MatrixMode;
 use crate::util::rand;
-use core::sync::atomic::Ordering;
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_time::{Duration, Ticker};
 
 pub async fn run() -> ! {
     let mut ticker = Ticker::every(Duration::from_millis(10));
@@ -19,15 +17,15 @@ pub async fn run() -> ! {
         }
         counter += 1;
 
-        for row in 0..Framebuffer::HEIGHT {
-            for col in 0..Framebuffer::WIDTH {
-                if buffer_matrix[row][col] < Matrix::fb().load(col, row) {
+        for (row, matrix_row) in buffer_matrix.iter_mut().enumerate() {
+            for (col, matrix_field) in matrix_row.iter_mut().enumerate() {
+                if *matrix_field < Matrix::fb().load(col, row) {
                     Matrix::fb().store(col, row, Matrix::fb().load(col, row) - 1);
-                } else if buffer_matrix[row][col] > Matrix::fb().load(col, row) {
+                } else if *matrix_field > Matrix::fb().load(col, row) {
                     Matrix::fb().store(col, row, Matrix::fb().load(col, row) + 1);
                 }
-                if buffer_matrix[row][col] == Matrix::fb().load(col, row) {
-                    buffer_matrix[row][col] = 0;
+                if *matrix_field == Matrix::fb().load(col, row) {
+                    *matrix_field = 0;
                 }
             }
         }

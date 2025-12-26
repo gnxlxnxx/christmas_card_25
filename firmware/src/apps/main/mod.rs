@@ -1,8 +1,11 @@
 use embassy_futures::select::{Either, select, select3};
-use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal, watch::Watch};
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
 use embassy_time::{Duration, Ticker};
 
-use crate::drivers::{buttons::{self, Button, Buttons, Event}, ws2812::Ws2812};
+use crate::drivers::{
+    buttons::{Button, Buttons, Event},
+    ws2812::Ws2812,
+};
 
 pub mod matrix;
 pub mod ws2812;
@@ -21,19 +24,31 @@ pub async fn run(ws2812: &mut Ws2812<'_>) {
             loop {
                 match select(Buttons::event(), clock.next()).await {
                     Either::First(ev) => match ev {
-                        Event { button: Button::Start, pressed: true } => return,
-                        Event { button: Button::Select, pressed: true } => {
+                        Event {
+                            button: Button::Start,
+                            pressed: true,
+                        } => return,
+                        Event {
+                            button: Button::Select,
+                            pressed: true,
+                        } => {
                             clock.reset();
                             auto = true;
-                        },
-                        Event { button: Button::L, pressed: true } => {
+                        }
+                        Event {
+                            button: Button::L,
+                            pressed: true,
+                        } => {
                             auto = false;
                             ws2812_next_signal.signal(());
-                        },
-                        Event { button: Button::R, pressed: true } => {
+                        }
+                        Event {
+                            button: Button::R,
+                            pressed: true,
+                        } => {
                             auto = false;
                             matrix_next_signal.signal(());
-                        },
+                        }
                         _ => (),
                     },
                     Either::Second(()) => {
@@ -41,7 +56,7 @@ pub async fn run(ws2812: &mut Ws2812<'_>) {
                             ws2812_next_signal.signal(());
                             matrix_next_signal.signal(());
                         }
-                    },
+                    }
                 }
             }
         },

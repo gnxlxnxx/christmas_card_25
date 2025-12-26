@@ -1,6 +1,6 @@
-use crate::drivers::ws2812::Color;
 use super::{HUETABLE, Ws2812Mode};
-use embassy_time::{Duration, Ticker, Timer};
+use crate::drivers::ws2812::Color;
+use embassy_time::{Duration, Ticker};
 
 // "Huewheel" mode
 pub struct Huewheel {
@@ -12,7 +12,7 @@ impl Huewheel {
     pub fn new() -> Self {
         Self {
             ticker: Ticker::every(Duration::from_millis(2)),
-            counter: 0
+            counter: 0,
         }
     }
 }
@@ -23,11 +23,11 @@ impl Ws2812Mode for Huewheel {
 
         let mut desired_output: [Color; 6] = [Color::new(0, 0, 0); 6];
 
-        for ledno in 0..6 {
+        for (ledno, led) in desired_output.iter_mut().enumerate() {
             let ang: usize = (self.counter as usize >> 3) + ledno * 60;
-            desired_output[ledno].r = HUETABLE[(ang + 85) & 0xff];
-            desired_output[ledno].g = HUETABLE[ang & 0xff];
-            desired_output[ledno].b = HUETABLE[(ang + 170) & 0xff];
+            led.r = HUETABLE[(ang + 85) % HUETABLE.len()];
+            led.g = HUETABLE[ang % HUETABLE.len()];
+            led.b = HUETABLE[(ang + 170) % HUETABLE.len()];
         }
         self.counter = (self.counter + 1) & 0x7ff;
         desired_output

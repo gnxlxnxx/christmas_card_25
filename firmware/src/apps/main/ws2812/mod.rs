@@ -1,8 +1,5 @@
-use core::future::pending;
-
-use embassy_futures::select::{Either, Either3, Either4, select, select3, select4};
-use embassy_sync::{blocking_mutex::raw::RawMutex, signal::Signal, watch};
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_futures::select::{Either, select};
+use embassy_sync::{blocking_mutex::raw::RawMutex, signal::Signal};
 
 use crate::drivers::ws2812::{Color, Ws2812};
 
@@ -49,20 +46,17 @@ pub async fn run(ws2812: &mut Ws2812<'_>, next_signal: &Signal<impl RawMutex, ()
     let mut output = [Color::new(0, 0, 0); 6];
 
     loop {
-        match select(
-            mode.animate(),
-            next_signal.wait()
-        ).await {
+        match select(mode.animate(), next_signal.wait()).await {
             Either::First(desired_output) => {
                 for (current, desired) in output.iter_mut().zip(desired_output) {
                     current.transition(desired);
                 }
 
                 ws2812.write(&output).await;
-            },
+            }
             Either::Second(()) => {
                 mode.next();
-            },
+            }
         }
     }
 }

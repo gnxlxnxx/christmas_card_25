@@ -1,7 +1,7 @@
+use super::{HUETABLE, SINTABLE, Ws2812Mode};
 use crate::drivers::ws2812::Color;
 use crate::util::rand;
-use super::{HUETABLE, SINTABLE, Ws2812Mode};
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_time::{Duration, Ticker};
 
 // Original "Fire" mode
 pub struct Fire {
@@ -28,19 +28,19 @@ impl Ws2812Mode for Fire {
 
         let mut desired_output: [Color; 6] = [Color::new(0, 0, 0); 6];
 
-        for k in 0..6 {
-            self.phases[k] += (((self.noisegen.rand8() as u16 + 0xf) << 2)
+        for phase in &mut self.phases {
+            *phase += (((self.noisegen.rand8() as u16 + 0xf) << 2)
                 + ((self.noisegen.rand8() as u16 + 0xf) << 1))
                 >> 1;
         }
 
-        for ledno in 0..6 {
+        for (ledno, led) in desired_output.iter_mut().enumerate() {
             let index: usize = (self.phases[ledno] >> 8) as usize;
             let rs: u8 = SINTABLE[index] >> 3;
 
-            desired_output[ledno].r = (HUETABLE[((rs + 30) & 0xff) as usize] as u32 >> 2) as u8;
-            desired_output[ledno].g = (HUETABLE[(rs + 0) as usize] as u32 >> 3) as u8;
-            desired_output[ledno].b = (HUETABLE[((rs + 190) & 0xff) as usize] as u32 >> 3) as u8;
+            led.r = (HUETABLE[rs.wrapping_add(30) as usize] as u32 >> 2) as u8;
+            led.g = (HUETABLE[rs as usize] as u32 >> 3) as u8;
+            led.b = (HUETABLE[rs.wrapping_add(190) as usize] as u32 >> 3) as u8;
         }
         desired_output
     }

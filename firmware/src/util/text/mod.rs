@@ -7,8 +7,6 @@ use crate::{
     util::text::font::Letter,
 };
 
-const DOWNSHIFT: usize = 2;
-
 fn move_left(fb: &Framebuffer) {
     for y in 0..Framebuffer::HEIGHT {
         for x in 0..Framebuffer::WIDTH {
