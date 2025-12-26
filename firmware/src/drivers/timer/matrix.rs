@@ -60,6 +60,18 @@ impl Framebuffer {
         self.0[y][x].store(val, Ordering::Relaxed)
     }
 
+    pub fn set_all(&self, val: u8) {
+        for row in &self.0 {
+            for pixel in row {
+                pixel.store(val, Ordering::Relaxed);
+            }
+        }
+    }
+
+    pub fn clear_all(&self) {
+        self.set_all(0);
+    }
+
     // Debug output
     pub fn show_u8(&self, y: usize, mut val: u8) {
         for i in (0..8).rev() {

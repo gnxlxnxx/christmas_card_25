@@ -808,10 +808,10 @@ impl Letter {
         }
     }
 
-    pub const fn downshift(row: u8) -> Option<usize> {
-        if row < Self::END_MARKER {
+    pub const fn downshift(col: u8) -> Option<usize> {
+        if col < Self::END_MARKER {
             Some(0)
-        } else if row > Self::END_MARKER {
+        } else if col > Self::END_MARKER {
             Some(2)
         } else {
         None

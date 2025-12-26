@@ -4,6 +4,7 @@
 
 pub mod drivers;
 pub mod util;
+pub mod apps;
 
 use embassy_time::{Duration, Ticker, Timer};
 use ch32_hal::{self as hal};
@@ -31,15 +32,6 @@ async fn ws2812_exec(
     }
 }
 
-async fn test() {
-    for _ in 0..10 {
-        Matrix::fb().store(0, 0, 32);
-        Timer::after_millis(500).await;
-        Matrix::fb().store(0, 0, 0);
-        Timer::after_millis(500).await;
-    }
-}
-
 #[embassy_executor::main(entry = "ch32_hal::entry")]
 async fn main(spawner: Spawner) -> ! {
     let p = hal::init(hal::Config {
@@ -58,7 +50,7 @@ async fn main(spawner: Spawner) -> ! {
     let mut clock = Ticker::every(Duration::from_millis(50));
 
     loop {
-        util::text::scroll(b"Die Fachschaft Elektro- und Informationstechnik an der \x80 Universit\xE4t Stuttgart w\xFCnscht euch allen recht herzlich ein frohes Weihnachtsfest!", 32, &mut clock).await;
+        util::text::scroll(b"Die Fachschaft Elektro- und Informationstechnik an der \x80 Universit\xE4t Stuttgart w\xFCnscht Euch allen recht herzlich ein frohes Weihnachtsfest!", 32, &mut clock).await;
         // util::text::scroll(b" !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~", 32, &mut clock).await;
         util::text::clear_scroll(&mut clock).await;
         // let event = Buttons::event().await;

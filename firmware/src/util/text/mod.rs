@@ -28,8 +28,8 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
     clock.next().await;
 
     for &c in text {
-        for mut row in Letter::get(c).0 {
-            let downshift = match Letter::downshift(row) {
+        for mut col in Letter::get(c).0 {
+            let downshift = match Letter::downshift(col) {
                 Some(n) => n,
                 None => break
             };
@@ -40,9 +40,9 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
                 fb.store(
                     Framebuffer::WIDTH - 1,
                     base_y + downshift,
-                    if row & 1 != 0 { brightness } else { 0 }
+                    if col & 1 != 0 { brightness } else { 0 }
                 );
-                row >>= 1;
+                col >>= 1;
             }
 
             clock.next().await;
