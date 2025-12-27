@@ -2,6 +2,8 @@ use ch32_hal as hal;
 use hal::spi::{Config, Spi};
 use hal::{Peri, peripherals};
 
+pub const LEDS: usize = 6;
+
 const BITQUARTETS: [u16; 16] = [
     0b1000100010001000,
     0b1000100010001110,
@@ -22,44 +24,52 @@ const BITQUARTETS: [u16; 16] = [
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub struct Color {
-    pub r: u8,
-    pub g: u8,
-    pub b: u8,
-}
+pub struct Color([u8; 3]);
 
 impl Color {
     pub fn new(r: u8, g: u8, b: u8) -> Self {
-        Self { r, g, b }
+        Self([g, r, b])
     }
 
-    pub fn transition(&mut self, desired_value: Self) {
-        if self.r > desired_value.r {
-            self.r -= 1;
-        } else if self.r < desired_value.r {
-            self.r += 1;
-        }
+    pub fn r(&self) -> u8 {
+        self.0[1]
+    }
 
-        if self.g > desired_value.g {
-            self.g -= 1;
-        } else if self.g < desired_value.g {
-            self.g += 1;
-        }
+    pub fn g(&self) -> u8 {
+        self.0[0]
+    }
 
-        if self.b > desired_value.b {
-            self.b -= 1;
-        } else if self.b < desired_value.b {
-            self.b += 1;
+    pub fn b(&self) -> u8 {
+        self.0[2]
+    }
+
+    pub fn set_r(&mut self, val: u8) {
+        self.0[1] = val;
+    }
+
+    pub fn set_g(&mut self, val: u8) {
+        self.0[0] = val;
+    }
+
+    pub fn set_b(&mut self, val: u8) {
+        self.0[2] = val;
+    }
+
+    pub fn transition(&mut self, desired_value: &Self) {
+        for (cur, target) in self.0.iter_mut().zip(desired_value.0) {
+            if target > *cur {
+                *cur += 1;
+            } else if target < *cur {
+                *cur -= 1;
+            }
         }
     }
 
-    fn gen_grb_data(&self, result: &mut [u16; 6]) {
-        result[0] = BITQUARTETS[(self.g >> 4) as usize];
-        result[1] = BITQUARTETS[(self.g & 0xF) as usize];
-        result[2] = BITQUARTETS[(self.r >> 4) as usize];
-        result[3] = BITQUARTETS[(self.r & 0xF) as usize];
-        result[4] = BITQUARTETS[(self.b >> 4) as usize];
-        result[5] = BITQUARTETS[(self.b & 0xF) as usize];
+    fn gen_grb_data(&self, buf: &mut [u16; 6]) {
+        for (val, data) in self.0.iter().zip(buf.as_chunks_mut::<2>().0) {
+            data[0] = BITQUARTETS[(val >> 4) as usize];
+            data[1] = BITQUARTETS[(val & 0xf) as usize];
+        }
     }
 }
 
@@ -68,6 +78,7 @@ pub struct Ws2812<'a> {
 }
 
 impl<'a> Ws2812<'a> {
+
     pub fn new(
         pin: Peri<'static, peripherals::PC6>,
         spi1: Peri<'static, peripherals::SPI1>,
@@ -83,11 +94,11 @@ impl<'a> Ws2812<'a> {
         Self { spi }
     }
 
-    pub async fn write(&mut self, colors: &[Color; 6]) {
+    pub async fn write(&mut self, colors: &[Color; LEDS]) {
         // I have 2 leading and one trailing led full of '0's
-        let mut buf = [[0u16; 6]; 6 + 3];
+        let mut buf = [[0u16; 6]; LEDS + 3];
 
-        for (signal, color) in buf[2..8].iter_mut().zip(colors) {
+        for (signal, color) in buf[2..LEDS + 2].iter_mut().zip(colors) {
             color.gen_grb_data(signal);
         }
 

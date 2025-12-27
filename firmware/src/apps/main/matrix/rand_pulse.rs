@@ -1,31 +1,39 @@
+use core::sync::atomic::Ordering;
+
 use crate::drivers::matrix::{Framebuffer, Matrix};
 use crate::util::rand;
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
+const TARGET_BRIGHTNESS: u8 = 150;
+
 pub async fn run() -> ! {
     let mut update_clock = Ticker::every(Duration::from_millis(10));
     let mut gen_clock = Ticker::every(Duration::from_millis(300));
-    let mut buffer_matrix = [[0; Framebuffer::WIDTH]; Framebuffer::HEIGHT];
+    let mut target_buf = [0u8; Framebuffer::HEIGHT];
     let mut noisegen = rand::WhiteNoiseGenerator::new();
 
     loop {
         match select(gen_clock.next(), update_clock.next()).await {
             Either::First(()) => {
                 let row = noisegen.rand8() as usize % Framebuffer::HEIGHT;
-                let col = noisegen.rand8() as usize % Framebuffer::WIDTH;
-                buffer_matrix[row][col] = 150;
+                let col = noisegen.rand8() as usize % 8;
+                target_buf[row] |= 1 << col;
             }
             Either::Second(()) => {
-                for (row, buffer_row) in buffer_matrix.iter_mut().enumerate().take(Framebuffer::HEIGHT) {
-                    for (col, buffer_field) in buffer_row.iter_mut().enumerate().take(Framebuffer::WIDTH) {
-                        if *buffer_field < Matrix::fb().load(col, row) {
-                            Matrix::fb().store(col, row, Matrix::fb().load(col, row) - 1);
-                        } else if *buffer_field > Matrix::fb().load(col, row) {
-                            Matrix::fb().store(col, row, Matrix::fb().load(col, row) + 1);
-                        }
-                        if *buffer_field == Matrix::fb().load(col, row) {
-                            *buffer_field = 0;
+                for (target_row, fb_row) in target_buf.iter_mut().zip(Matrix::fb().0.iter()) {
+                    for (col, fb_field) in fb_row.iter().enumerate() {
+                        let fb_current = fb_field.load(Ordering::Relaxed);
+                        let target = *target_row & (1 << col) != 0;
+
+                        if target {
+                            if fb_current < TARGET_BRIGHTNESS {
+                                fb_field.store(fb_current + 1, Ordering::Relaxed);
+                            } else {
+                                *target_row &= !(1 << col);
+                            }
+                        } else if fb_current > 0 {
+                            fb_field.store(fb_current - 1, Ordering::Relaxed);
                         }
                     }
                 }

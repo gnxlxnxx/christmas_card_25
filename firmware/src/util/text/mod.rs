@@ -1,5 +1,7 @@
 mod font;
 
+use core::{iter, sync::atomic::Ordering};
+
 use embassy_time::Ticker;
 
 use crate::{
@@ -8,16 +10,16 @@ use crate::{
 };
 
 fn move_left(fb: &Framebuffer) {
-    for y in 0..Framebuffer::HEIGHT {
-        for x in 0..Framebuffer::WIDTH {
-            fb.store(x, y, fb.try_load(x + 1, y).unwrap_or(0));
-        }
+    for row in fb.0.iter() {
+        row.iter().zip(row.iter().skip(1).map(|r| r.load(Ordering::Relaxed)).chain(iter::repeat(0))).for_each(|(l, r)| l.store(r, Ordering::Relaxed));
     }
 }
 
 pub async fn clear_scroll(clock: &mut Ticker) {
+    let fb = Matrix::fb();
+
     for _ in 0..Framebuffer::WIDTH - 1 {
-        move_left(Matrix::fb());
+        move_left(fb);
         clock.next().await;
     }
 }
@@ -28,8 +30,8 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
     move_left(fb);
     clock.next().await;
 
-    for &c in text {
-        for mut col in Letter::get(c).0 {
+    for c in text {
+        for mut col in Letter::get(*c).0 {
             let downshift = match Letter::downshift(col) {
                 Some(n) => n,
                 None => break,
@@ -37,11 +39,10 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
 
             move_left(fb);
 
-            for base_y in 0..Framebuffer::HEIGHT - 2 {
-                fb.store(
-                    Framebuffer::WIDTH - 1,
-                    base_y + downshift,
+            for row in fb.0.iter().skip(downshift).take(fb.0.len() - 2) {
+                row.last().unwrap().store(
                     if col & 1 != 0 { brightness } else { 0 },
+                    Ordering::Relaxed
                 );
                 col >>= 1;
             }

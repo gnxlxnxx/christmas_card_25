@@ -1,14 +1,14 @@
 use embassy_futures::select::{Either, select};
 use embassy_sync::{blocking_mutex::raw::RawMutex, signal::Signal};
 
-use crate::drivers::ws2812::{Color, Ws2812};
+use crate::drivers::ws2812::{self, Color, Ws2812};
 
 pub mod fire;
 pub mod huewheel;
 pub mod snowball;
 
 pub trait Ws2812Mode {
-    fn animate(&mut self) -> impl core::future::Future<Output = [Color; 6]>;
+    fn animate(&mut self) -> impl core::future::Future<Output = [Color; ws2812::LEDS]>;
 }
 
 pub enum Mode {
@@ -32,7 +32,7 @@ impl Mode {
 }
 
 impl Ws2812Mode for Mode {
-    async fn animate(&mut self) -> [Color; 6] {
+    async fn animate(&mut self) -> [Color; ws2812::LEDS] {
         match self {
             Self::Fire(a) => a.animate().await,
             Self::Snowball(a) => a.animate().await,
@@ -43,12 +43,12 @@ impl Ws2812Mode for Mode {
 
 pub async fn run(ws2812: &mut Ws2812<'_>, next_signal: &Signal<impl RawMutex, ()>) -> ! {
     let mut mode = Mode::new();
-    let mut output = [Color::new(0, 0, 0); 6];
+    let mut output = [Color::new(0, 0, 0); ws2812::LEDS];
 
     loop {
         match select(mode.animate(), next_signal.wait()).await {
             Either::First(desired_output) => {
-                for (current, desired) in output.iter_mut().zip(desired_output) {
+                for (current, desired) in output.iter_mut().zip(desired_output.iter()) {
                     current.transition(desired);
                 }
 

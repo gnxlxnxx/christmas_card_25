@@ -6,10 +6,6 @@ mod rand_pulse;
 mod snowfall;
 mod sparkle;
 
-trait MatrixMode {
-    fn animate(&mut self) -> impl core::future::Future<Output = ()>;
-}
-
 enum Mode {
     Message,
     Snowfall,
@@ -30,9 +26,7 @@ impl Mode {
             Self::RandPulse => Self::Message,
         }
     }
-}
 
-impl MatrixMode for Mode {
     async fn animate(&mut self) {
         match self {
             Self::Message => message::run().await,

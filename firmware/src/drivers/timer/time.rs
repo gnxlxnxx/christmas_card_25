@@ -18,7 +18,7 @@ pub(super) struct TimeDriver {
 }
 
 impl TimeDriver {
-    pub fn advance(&self) {
+    pub(super) fn advance(&self) {
         critical_section::with(|cs| {
             let now_box = self.now.borrow(cs);
             let next_box = self.next.borrow(cs);

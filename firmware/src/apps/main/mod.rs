@@ -10,7 +10,7 @@ use crate::drivers::{
 pub mod matrix;
 pub mod ws2812;
 
-const AUTO_DURATION: Duration = Duration::from_secs(30);
+const AUTO_DURATION: Duration = Duration::from_secs(45);
 
 pub async fn run(ws2812: &mut Ws2812<'_>) {
     let ws2812_next_signal: Signal<NoopRawMutex, ()> = Signal::new();

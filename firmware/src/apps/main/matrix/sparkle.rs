@@ -1,9 +1,11 @@
+use core::sync::atomic::Ordering;
+
 use crate::drivers::matrix::{Framebuffer, Matrix};
 use crate::util::rand;
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
-pub async fn run() {
+pub async fn run() -> ! {
     let mut update_clock = Ticker::every(Duration::from_millis(4));
     let mut gen_clock = Ticker::every(Duration::from_millis(256));
     let mut noisegen = rand::WhiteNoiseGenerator::new();
@@ -18,10 +20,10 @@ pub async fn run() {
                 }
             }
             Either::Second(()) => {
-                for row in 0..Framebuffer::HEIGHT {
-                    for col in 0..Framebuffer::WIDTH {
-                        let cur = Matrix::fb().load(col, row) as u32;
-                        Matrix::fb().store(col, row, (((cur << 7) - cur) >> 7) as u8);
+                for row in Matrix::fb().0.iter() {
+                    for field in row {
+                        let cur = field.load(Ordering::Relaxed) as u32;
+                        field.store((((cur << 7) - cur) >> 7) as u8, Ordering::Relaxed);
                     }
                 }
             }
