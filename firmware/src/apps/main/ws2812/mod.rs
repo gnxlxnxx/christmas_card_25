@@ -1,62 +1,47 @@
 use embassy_futures::select::{Either, select};
 use embassy_sync::{blocking_mutex::raw::RawMutex, signal::Signal};
 
-use crate::drivers::ws2812::{self, Color, Ws2812};
+use crate::{drivers::ws2812::{self, Color, Ws2812}, util::ws2812::FilteredWs2812};
 
 pub mod fire;
 pub mod huewheel;
 pub mod snowball;
 
-pub trait Ws2812Mode {
-    fn animate(&mut self) -> impl core::future::Future<Output = [Color; ws2812::LEDS]>;
-}
-
 pub enum Mode {
-    Fire(fire::Fire),
-    Snowball(snowball::Snowball),
-    Huewheel(huewheel::Huewheel),
+    Fire,
+    Snowball,
+    Huewheel,
 }
 
 impl Mode {
     pub fn new() -> Self {
-        Self::Fire(fire::Fire::new())
+        Self::Fire
     }
 
     pub fn next(&mut self) {
         *self = match self {
-            Self::Fire(_) => Self::Snowball(snowball::Snowball::new()),
-            Self::Snowball(_) => Self::Huewheel(huewheel::Huewheel::new()),
-            Self::Huewheel(_) => Self::Fire(fire::Fire::new()),
+            Self::Fire => Self::Snowball,
+            Self::Snowball => Self::Huewheel,
+            Self::Huewheel => Self::Fire,
         };
     }
-}
 
-impl Ws2812Mode for Mode {
-    async fn animate(&mut self) -> [Color; ws2812::LEDS] {
+    async fn animate(&mut self, filt_ws2812: &mut FilteredWs2812<'_, '_>) -> [Color; ws2812::LEDS] {
         match self {
-            Self::Fire(a) => a.animate().await,
-            Self::Snowball(a) => a.animate().await,
-            Self::Huewheel(a) => a.animate().await,
+            Self::Fire => fire::run(filt_ws2812).await,
+            Self::Snowball => snowball::run(filt_ws2812).await,
+            Self::Huewheel => huewheel::run(filt_ws2812).await,
         }
     }
 }
 
 pub async fn run(ws2812: &mut Ws2812<'_>, next_signal: &Signal<impl RawMutex, ()>) -> ! {
     let mut mode = Mode::new();
-    let mut output = [Color::new(0, 0, 0); ws2812::LEDS];
+    let mut filt_ws2812 = FilteredWs2812::new(ws2812);
 
     loop {
-        match select(mode.animate(), next_signal.wait()).await {
-            Either::First(desired_output) => {
-                for (current, desired) in output.iter_mut().zip(desired_output.iter()) {
-                    current.transition(desired);
-                }
-
-                ws2812.write(&output).await;
-            }
-            Either::Second(()) => {
-                mode.next();
-            }
+        if select(mode.animate(&mut filt_ws2812), next_signal.wait()).await.is_second() {
+            mode.next();
         }
     }
 }
