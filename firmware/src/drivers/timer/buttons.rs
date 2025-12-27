@@ -14,7 +14,6 @@ static BTN_STATE: Group<AtomicBool> = Group([
     AtomicBool::new(false),
 ]);
 
-// pub(super) static BTN_SAMPLE_SIGNAL: Signal<CriticalSectionRawMutex, Sample> = Signal::new();
 static BTN_EVENT_CHANNEL: Channel<CriticalSectionRawMutex, Event, 3> = Channel::new();
 
 #[derive(Debug)]
