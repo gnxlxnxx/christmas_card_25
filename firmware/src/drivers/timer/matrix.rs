@@ -95,10 +95,10 @@ impl Framebuffer {
         self.show_u8(y + 1, val as u8);
     }
 
-    pub(super) fn get_pwm(&self, col: usize, row: usize, cycles: u32) -> u32 {
+    pub(super) fn get_pwm(&self, col: usize, row: usize, cycles: u16) -> u16 {
         let x = if col <= row { col } else { col - 1 };
 
-        cycles - (GAMMA_LUT[self.try_load(x, row).unwrap_or(0) as usize] as u32)
+        cycles - GAMMA_LUT[self.try_load(x, row).unwrap_or(0) as usize]
     }
 }
 
