@@ -38,7 +38,7 @@ pub async fn run() -> ! {
                 }
 
                 for field in fb.0.first().unwrap() {
-                    field.store(if noisegen.rand8() > 250 { 127 } else { 0 }, Ordering::Relaxed);
+                    field.store(if noisegen.rand8() < 4 { 127 } else { 0 }, Ordering::Relaxed);
                 }
             }
             Either::Second(()) => {

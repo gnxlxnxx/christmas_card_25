@@ -6,7 +6,7 @@ use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
 pub async fn run(filt_ws2812: &mut FilteredWs2812<'_, '_>) -> ! {
-    let mut progress_clock = Ticker::every(Duration::from_millis(30));
+    let mut progress_clock = Ticker::every(Duration::from_millis(10));
     let mut update_clock = Ticker::every(Duration::from_millis(1));
 
     let mut noisegen = rand::WhiteNoiseGenerator::new();
@@ -31,8 +31,6 @@ pub async fn run(filt_ws2812: &mut FilteredWs2812<'_, '_>) -> ! {
                     led.set_g((HUETABLE[rs as usize] as u32 >> 3) as u8);
                     led.set_b((HUETABLE[rs.wrapping_add(190) as usize] as u32 >> 3) as u8);
                 }
-
-                progress_clock.next().await;
             }
             Either::Second(()) => {
                 filt_ws2812.update().await;

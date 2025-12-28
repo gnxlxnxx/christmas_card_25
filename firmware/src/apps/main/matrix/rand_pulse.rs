@@ -8,8 +8,8 @@ use embassy_time::{Duration, Ticker};
 const TARGET_BRIGHTNESS: u8 = 150;
 
 pub async fn run() -> ! {
-    let mut update_clock = Ticker::every(Duration::from_millis(10));
     let mut gen_clock = Ticker::every(Duration::from_millis(300));
+    let mut update_clock = Ticker::every(Duration::from_millis(10));
     let mut target_buf = [0u8; Framebuffer::HEIGHT];
     let mut noisegen = rand::WhiteNoiseGenerator::new();
 
