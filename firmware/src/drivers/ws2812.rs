@@ -78,7 +78,6 @@ pub struct Ws2812<'a> {
 }
 
 impl<'a> Ws2812<'a> {
-
     pub fn new(
         pin: Peri<'static, peripherals::PC6>,
         spi1: Peri<'static, peripherals::SPI1>,

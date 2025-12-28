@@ -1,8 +1,8 @@
-use crate::drivers::matrix::{Framebuffer, Matrix};
+use crate::drivers::matrix::Matrix;
 use crate::util::rand;
 use core::sync::atomic::Ordering;
 use embassy_futures::select::{Either, select};
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_time::{Duration, Ticker};
 
 pub async fn run() -> ! {
     let fb = Matrix::fb();
@@ -38,7 +38,10 @@ pub async fn run() -> ! {
                 }
 
                 for field in fb.0.first().unwrap() {
-                    field.store(if noisegen.rand8() < 4 { 127 } else { 0 }, Ordering::Relaxed);
+                    field.store(
+                        if noisegen.rand8() < 4 { 127 } else { 0 },
+                        Ordering::Relaxed,
+                    );
                 }
             }
             Either::Second(()) => {

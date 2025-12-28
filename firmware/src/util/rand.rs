@@ -17,7 +17,7 @@ impl WhiteNoiseGenerator {
 
     pub fn rand8(&mut self) -> u8 {
         let mut lfsr = LFSR.load(Ordering::Relaxed);
-        for bit in 0..NOISE_BITS {
+        for _bit in 0..NOISE_BITS {
             let new_data: u32 = (lfsr >> NOISE_POLY_TAP0)
                 ^ (lfsr >> NOISE_POLY_TAP1)
                 ^ (lfsr >> NOISE_POLY_TAP2)

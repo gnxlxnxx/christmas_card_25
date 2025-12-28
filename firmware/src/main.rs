@@ -18,7 +18,7 @@ use drivers::{
 use crate::apps::main;
 
 #[embassy_executor::main(entry = "ch32_hal::entry")]
-async fn main(spawner: Spawner) -> ! {
+async fn main(_spawner: Spawner) -> ! {
     let p = hal::init(hal::Config {
         rcc: hal::rcc::Config::SYSCLK_FREQ_48MHZ_HSI,
         dma_interrupt_priority: qingke::interrupt::Priority::P0,

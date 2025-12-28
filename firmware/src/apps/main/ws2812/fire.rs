@@ -1,5 +1,5 @@
 use super::{HUETABLE, SINTABLE};
-use crate::drivers::ws2812::{self, Color};
+use crate::drivers::ws2812::{self};
 use crate::util::rand;
 use crate::util::ws2812::FilteredWs2812;
 use embassy_futures::select::{Either, select};

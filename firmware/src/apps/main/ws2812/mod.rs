@@ -1,7 +1,10 @@
-use embassy_futures::select::{Either, select};
+use embassy_futures::select::select;
 use embassy_sync::{blocking_mutex::raw::RawMutex, signal::Signal};
 
-use crate::{drivers::ws2812::{self, Color, Ws2812}, util::ws2812::FilteredWs2812};
+use crate::{
+    drivers::ws2812::{self, Color, Ws2812},
+    util::ws2812::FilteredWs2812,
+};
 
 pub mod fire;
 pub mod huewheel;
@@ -40,7 +43,10 @@ pub async fn run(ws2812: &mut Ws2812<'_>, next_signal: &Signal<impl RawMutex, ()
     let mut filt_ws2812 = FilteredWs2812::new(ws2812);
 
     loop {
-        if select(mode.animate(&mut filt_ws2812), next_signal.wait()).await.is_second() {
+        if select(mode.animate(&mut filt_ws2812), next_signal.wait())
+            .await
+            .is_second()
+        {
             mode.next();
         }
     }

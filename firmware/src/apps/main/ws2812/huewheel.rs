@@ -1,5 +1,8 @@
-use super::{HUETABLE};
-use crate::{drivers::ws2812::{self, Color}, util::ws2812::FilteredWs2812};
+use super::HUETABLE;
+use crate::{
+    drivers::ws2812::{self},
+    util::ws2812::FilteredWs2812,
+};
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 

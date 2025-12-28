@@ -11,7 +11,14 @@ use crate::{
 
 fn move_left(fb: &Framebuffer) {
     for row in fb.0.iter() {
-        row.iter().zip(row.iter().skip(1).map(|r| r.load(Ordering::Relaxed)).chain(iter::repeat(0))).for_each(|(l, r)| l.store(r, Ordering::Relaxed));
+        row.iter()
+            .zip(
+                row.iter()
+                    .skip(1)
+                    .map(|r| r.load(Ordering::Relaxed))
+                    .chain(iter::repeat(0)),
+            )
+            .for_each(|(l, r)| l.store(r, Ordering::Relaxed));
     }
 }
 
