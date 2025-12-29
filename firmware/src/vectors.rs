@@ -1,6 +1,3 @@
-use ch32_hal::interrupt;
-#[interrupt]
-fn EXTI7_0_IRQHandler() {}
 mod _vectors {
     unsafe extern "C" {
         fn WWDG();

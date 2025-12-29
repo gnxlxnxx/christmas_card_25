@@ -31,8 +31,6 @@ PROVIDE(Exception = _exception_handler);
 PROVIDE(DefaultHandler = DefaultInterruptHandler);
 PROVIDE(ExceptionHandler = DefaultExceptionHandler);
 
-/* PROVIDE(__EXTERNAL_INTERRUPTS = __DEFAULT_EXTERNAL_INTERRUPTS);*/
-
 /* # Interrupt vectors */
 EXTERN(__CORE_INTERRUPTS);
 EXTERN(__EXTERNAL_INTERRUPTS_USB); /* `static` variable similar to `__EXCEPTIONS` */
@@ -41,37 +39,24 @@ ENTRY(_start)
 
 SECTIONS
 {
-    /* init jump opcode */
-    .init :
+    .vector_table ORIGIN(FLASH) :
     {
-        . = ALIGN(4);
         KEEP(*(SORT_NONE(.init)))
         . = ALIGN(4);
-    } >FLASH AT>FLASH
-
-    /* highcode section will be copied to RAM offset 0x0 */
-    .highcode : ALIGN(4)
-    {
-        _highcode_lma = LOADADDR(.highcode);
-        PROVIDE(_highcode_vma_start = .);
-        LONG(0x00000000); /* Placeholder for the first vector */
+        /* core interrupts table's first entry is omitted, occupied by the init jump instruction */
         KEEP(*(.vector_table.core_interrupts));
         KEEP(*(.vector_table.external_interrupts_usb));
         KEEP(*(.vector_table.exceptions));
         *(.trap .trap.rust)
-        *(.highcode);
-        *(.highcode.*);
-		. = ALIGN(4);
-        PROVIDE(_highcode_vma_end = .);
-    } >RAM AT>FLASH
+    } >FLASH AT>FLASH
 
-    /* FIXME: if highcode section is large enough, then .init jump might be impossible to jump to .handle_reset */
     .text : ALIGN(4)
     {
         . = ALIGN(4);
         KEEP(*(SORT_NONE(.handle_reset)))
         *(.init.rust)
         *(.text .text.*)
+        *(.highcode .highcode.*);
     } >FLASH AT>FLASH
 
     .rodata : ALIGN(4)
@@ -92,14 +77,14 @@ SECTIONS
         PROVIDE( _edata = .);
     } >RAM AT>FLASH
 
-    .bss : ALIGN(4)
+    .bss (NOLOAD) : ALIGN(4)
     {
         PROVIDE( _sbss = .);
         *(.sbss .sbss.* .bss .bss.*);
         PROVIDE( _ebss = .);
-    } >RAM AT>FLASH
+    } >RAM
 
-    .stack ORIGIN(RAM)+LENGTH(RAM) :
+    .stack ORIGIN(RAM)+LENGTH(RAM) (NOLOAD) :
     {
         . = ALIGN(4);
         PROVIDE(_stack_top = . );
