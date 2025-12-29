@@ -20,7 +20,7 @@ pub async fn run(filt_ws2812: &mut FilteredWs2812<'_, '_>) -> ! {
         match select(progress_clock.next(), update_clock.next()).await {
             Either::First(()) => {
                 for phase in &mut phases {
-                    *phase += noisegen.rand8() as u16;
+                    *phase = phase.wrapping_add(noisegen.rand8() as u16);
                 }
 
                 for (led, phase) in filt_ws2812.target_mut().iter_mut().zip(phases) {

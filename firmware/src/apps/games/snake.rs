@@ -12,6 +12,26 @@ enum Direction {
     Left,
 }
 
+impl Direction {
+    pub fn cw(&self) -> Self {
+        match self {
+            Self::Up => Self::Right,
+            Self::Right => Self::Down,
+            Self::Down => Self::Left,
+            Self::Left => Self::Up,
+        }
+    }
+
+    pub fn ccw(&self) -> Self {
+        match self {
+            Self::Left => Self::Down,
+            Self::Down => Self::Right,
+            Self::Right => Self::Up,
+            Self::Up => Self::Left,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum FieldState {
     Empty,
@@ -20,30 +40,39 @@ enum FieldState {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-struct Coordinate {
-    x: usize,
-    y: usize,
+struct FbCoordinate {
+    pub x: u8,
+    pub y: u8,
 }
 
-impl Coordinate {
-    fn set_fb(&self, fb: &Framebuffer, val: u8) {
-        fb.store(self.x, self.y, val);
+impl FbCoordinate {
+    pub fn set_fb(&self, fb: &Framebuffer, val: u8) {
+        fb.store(self.x as usize, self.y as usize, val);
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-struct Field([[FieldState; Framebuffer::WIDTH]; Framebuffer::HEIGHT]);
+#[derive(Debug)]
+struct Field<'a> {
+    field: [[FieldState; Framebuffer::WIDTH]; Framebuffer::HEIGHT],
+    fb: &'a Framebuffer,
+}
 
-impl Field {
-    fn get(&self, c: Coordinate) -> FieldState {
-        self.0[c.y][c.x]
+impl<'a> Field<'a> {
+    fn new(fb: &'a Framebuffer) -> Self {
+        fb.clear_all();
+        Self {
+            field: [[FieldState::Empty; Framebuffer::WIDTH]; Framebuffer::HEIGHT],
+            fb,
+        }
+    }
+    fn get(&self, c: FbCoordinate) -> FieldState {
+        self.field[c.y as usize][c.x as usize]
     }
 
-    fn set(&mut self, c: Coordinate, state: FieldState) {
-        self.0[c.y][c.x] = state;
-        Matrix::fb().store(
-            c.x,
-            c.y,
+    fn set(&mut self, c: FbCoordinate, state: FieldState) {
+        self.field[c.y as usize][c.x as usize] = state;
+        c.set_fb(
+            self.fb,
             match state {
                 FieldState::Empty => 0,
                 FieldState::Snake(_) => HEAD_BRIGHTNESS,
@@ -55,39 +84,37 @@ impl Field {
     fn gen_maultasch(&mut self) {}
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-struct Game {
-    field: Field,
+#[derive(Debug)]
+struct Game<'a> {
+    field: Field<'a>,
     dir: Direction,
     dir_change: i32,
     length: u8,
     length_increase: u8,
     score: u8,
-    head: Coordinate,
-    tail: Coordinate,
+    head: FbCoordinate,
+    tail: FbCoordinate,
 }
 
-impl Game {
-    fn new(fb: &Framebuffer) -> Game {
+impl<'a> Game<'a> {
+    fn new(fb: &'a Framebuffer) -> Self {
         let mut g = Game {
-            field: Field([[FieldState::Empty; Framebuffer::WIDTH]; Framebuffer::HEIGHT]),
+            field: Field::new(fb),
             dir: Direction::Right,
             dir_change: 0,
             length: 1,
             length_increase: 1,
             score: 0,
-            head: Coordinate {
+            head: FbCoordinate {
                 x: 0,
-                y: Framebuffer::HEIGHT / 2,
+                y: (Framebuffer::HEIGHT / 2) as u8,
             },
-            tail: Coordinate {
+            tail: FbCoordinate {
                 x: 0,
-                y: Framebuffer::HEIGHT / 2,
+                y: (Framebuffer::HEIGHT / 2) as u8,
             },
         };
 
-        fb.clear_all();
-        g.head.set_fb(fb, HEAD_BRIGHTNESS);
         g.field.set(g.head, FieldState::Snake(g.dir));
         g.field.gen_maultasch();
 
@@ -97,5 +124,5 @@ impl Game {
 
 pub async fn run() {
     let fb = Matrix::fb();
-    let mut g = Game::new(fb);
+    let mut g = Game::new(&fb);
 }
