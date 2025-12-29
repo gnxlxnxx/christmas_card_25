@@ -5,6 +5,7 @@
 pub mod apps;
 pub mod drivers;
 pub mod util;
+mod vectors;
 
 use ch32_hal::{self as hal};
 use embassy_executor::Spawner;
