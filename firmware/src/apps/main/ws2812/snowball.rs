@@ -24,8 +24,6 @@ pub async fn run(filt_ws2812: &mut FilteredWs2812<'_, '_>) -> ! {
                 snowballs[0] = snowballs[1];
                 snowballs[1] = snowballs[2];
                 snowballs[2] = if noisegen.rand8() < probability {
-                    Color::new(0, 0, 0)
-                } else {
                     let hue: u8 = noisegen.rand8();
 
                     Color::new(
@@ -33,13 +31,13 @@ pub async fn run(filt_ws2812: &mut FilteredWs2812<'_, '_>) -> ! {
                         HUETABLE[hue as usize],
                         HUETABLE[hue.wrapping_add(170) as usize],
                     )
+                } else {
+                    Color::new(0, 0, 0)
                 };
 
                 snowballs[5] = snowballs[4];
                 snowballs[4] = snowballs[3];
                 snowballs[3] = if noisegen.rand8() < probability {
-                    Color::new(0, 0, 0)
-                } else {
                     let hue = noisegen.rand8();
 
                     Color::new(
@@ -47,6 +45,8 @@ pub async fn run(filt_ws2812: &mut FilteredWs2812<'_, '_>) -> ! {
                         HUETABLE[hue as usize],
                         HUETABLE[hue.wrapping_add(170) as usize],
                     )
+                } else {
+                    Color::new(0, 0, 0)
                 };
             }
             Either::Second(()) => {

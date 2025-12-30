@@ -91,9 +91,9 @@ impl TimerDriver {
                 });
 
                 // Set pwm values
-                self.tim1.regs_gp16().chcvr(0).write_value(self.get_pwm(5));
-                self.tim1.regs_gp16().chcvr(1).write_value(self.get_pwm(2));
-                self.tim1.regs_gp16().chcvr(3).write_value(self.get_pwm(7));
+                self.tim1.set_compare_value(Channel::Ch1, self.get_pwm(5) as u32);
+                self.tim1.set_compare_value(Channel::Ch2, self.get_pwm(2) as u32);
+                self.tim1.set_compare_value(Channel::Ch4, self.get_pwm(7) as u32);
 
                 // TIM1: Attach positive led pins
                 // TIM2: Attach button pins as inputs with pull resistor
@@ -221,12 +221,12 @@ impl TimerDriver {
                 });
 
                 // Set pwm values
-                self.tim1.regs_gp16().chcvr(0).write_value(self.get_pwm(0));
-                self.tim1.regs_gp16().chcvr(1).write_value(self.get_pwm(1));
-                self.tim2.regs_gp16().chcvr(0).write_value(self.get_pwm(8));
-                self.tim2.regs_gp16().chcvr(1).write_value(self.get_pwm(6));
-                self.tim2.regs_gp16().chcvr(2).write_value(self.get_pwm(3));
-                self.tim2.regs_gp16().chcvr(3).write_value(self.get_pwm(4));
+                self.tim1.set_compare_value(Channel::Ch1, self.get_pwm(0) as u32);
+                self.tim1.set_compare_value(Channel::Ch2, self.get_pwm(1) as u32);
+                self.tim2.set_compare_value(Channel::Ch1, self.get_pwm(8) as u32);
+                self.tim2.set_compare_value(Channel::Ch2, self.get_pwm(6) as u32);
+                self.tim2.set_compare_value(Channel::Ch3, self.get_pwm(3) as u32);
+                self.tim2.set_compare_value(Channel::Ch4, self.get_pwm(4) as u32);
 
                 self.btn.set_high_all();
 
