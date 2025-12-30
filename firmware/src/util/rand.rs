@@ -8,6 +8,7 @@ const NOISE_POLY_TAP3: u32 = 0;
 
 static LFSR: AtomicU32 = AtomicU32::new(1);
 
+#[derive(Debug)]
 pub struct WhiteNoiseGenerator;
 
 impl WhiteNoiseGenerator {

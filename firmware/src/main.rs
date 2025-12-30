@@ -15,7 +15,7 @@ use drivers::{
     matrix::{self},
 };
 
-use crate::apps::main;
+use crate::{apps::{games, main}, drivers::matrix::Matrix};
 
 #[qingke_rt::entry]
 fn main() -> ! {
@@ -35,6 +35,7 @@ fn main() -> ! {
     block_on(async {
         loop {
             main::run(&mut ws2812).await;
+            games::run(&mut ws2812).await;
         }
     })
 }

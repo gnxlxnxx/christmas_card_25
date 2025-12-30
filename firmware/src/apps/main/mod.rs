@@ -27,7 +27,7 @@ pub async fn run(ws2812: &mut Ws2812<'_>) {
                         Event {
                             button: Button::Start,
                             pressed: true,
-                        } => return,
+                        } => break,
                         Event {
                             button: Button::Select,
                             pressed: true,
