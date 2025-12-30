@@ -15,14 +15,9 @@ ch32-hal = { git = "https://github.com/ch32-rs/ch32-hal.git", default-features =
     "rt",
     "memory-x",
 ] }
-embassy-executor = { version = "0.9.1", features = [
-    "arch-spin",
-    "executor-thread"
-] }
 embassy-futures = "0.1.2"
 embassy-sync = "0.7.2"
-embassy-time = { version = "0.5.0" }
-embassy-time-queue-utils = "0.3.0"
+embassy-time = "0.5.0"
 embassy-time-driver = { version = "0.2.1", features = [ "tick-hz-10_000" ] }
 critical-section = "1.2.0"
 qingke-rt = "0.6.1"

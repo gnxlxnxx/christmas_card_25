@@ -1,11 +1,11 @@
 use embassy_futures::select::{Either, select, select3};
-use embassy_sync::{blocking_mutex::raw::NoopRawMutex, signal::Signal};
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex};
 use embassy_time::{Duration, Ticker};
 
-use crate::drivers::{
+use crate::{drivers::{
     buttons::{Button, Buttons, Event},
     ws2812::Ws2812,
-};
+}, util::sync::{self, Signal}};
 
 pub mod matrix;
 pub mod ws2812;
@@ -13,8 +13,8 @@ pub mod ws2812;
 const AUTO_DURATION: Duration = Duration::from_secs(45);
 
 pub async fn run(ws2812: &mut Ws2812<'_>) {
-    let ws2812_next_signal: Signal<NoopRawMutex, ()> = Signal::new();
-    let matrix_next_signal: Signal<NoopRawMutex, ()> = Signal::new();
+    let ws2812_next_event = sync::Event::new();
+    let matrix_next_event = sync::Event::new();
 
     select3(
         async {
@@ -40,27 +40,27 @@ pub async fn run(ws2812: &mut Ws2812<'_>) {
                             pressed: true,
                         } => {
                             auto = false;
-                            ws2812_next_signal.signal(());
+                            ws2812_next_event.trigger();
                         }
                         Event {
                             button: Button::R,
                             pressed: true,
                         } => {
                             auto = false;
-                            matrix_next_signal.signal(());
+                            matrix_next_event.trigger();
                         }
                         _ => (),
                     },
                     Either::Second(()) => {
                         if auto {
-                            ws2812_next_signal.signal(());
-                            matrix_next_signal.signal(());
+                            ws2812_next_event.trigger();
+                            matrix_next_event.trigger();
                         }
                     }
                 }
             }
         },
-        matrix::run(&matrix_next_signal),
-        ws2812::run(ws2812, &ws2812_next_signal),
+        matrix::run(&matrix_next_event),
+        ws2812::run(ws2812, &ws2812_next_event),
     ).await;
 }

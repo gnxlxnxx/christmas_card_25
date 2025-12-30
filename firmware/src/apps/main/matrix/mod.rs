@@ -1,5 +1,7 @@
 use embassy_futures::select::select;
-use embassy_sync::{blocking_mutex::raw::RawMutex, signal::Signal};
+use embassy_sync::{blocking_mutex::raw::RawMutex};
+
+use crate::util::sync::{Event, Signal};
 
 mod message;
 mod rand_pulse;
@@ -37,11 +39,11 @@ impl Mode {
     }
 }
 
-pub async fn run(next_signal: &Signal<impl RawMutex, ()>) -> ! {
+pub async fn run(next_event: &Event) -> ! {
     let mut mode = Mode::new();
 
     loop {
-        if select(mode.animate(), next_signal.wait()).await.is_second() {
+        if select(mode.animate(), next_event.wait()).await.is_second() {
             mode.next();
         }
     }

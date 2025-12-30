@@ -3,6 +3,8 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use ch32_hal::{Peri, pac, peripherals};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
 
+use crate::util::sync::Signal;
+
 const HIST_LOW: u16 = 80;
 const HIST_HIGH: u16 = 96;
 const FILT_LEN: u8 = 6;
@@ -14,7 +16,7 @@ static BTN_STATE: Group<AtomicBool> = Group([
     AtomicBool::new(false),
 ]);
 
-static BTN_EVENT_CHANNEL: Channel<CriticalSectionRawMutex, Event, 3> = Channel::new();
+static BTN_EVENT_SIGNAL: Signal<CriticalSectionRawMutex, Event> = Signal::new();
 
 #[derive(Debug)]
 pub struct Pins<'a> {
@@ -135,7 +137,7 @@ pub(super) fn process_samples(sample: Sample, fcount: &mut Group<u8>) {
             } else {
                 let next_state = !prev_state;
                 ext_state.store(next_state, Ordering::Relaxed);
-                let _ = BTN_EVENT_CHANNEL.try_send(Event {
+                let _ = BTN_EVENT_SIGNAL.signal(Event {
                     button: ch.try_into().unwrap(),
                     pressed: next_state,
                 });
@@ -155,7 +157,7 @@ impl Buttons {
         BTN_STATE.get(btn).load(Ordering::Relaxed)
     }
 
-    pub async fn event() -> Event {
-        BTN_EVENT_CHANNEL.receive().await
+    pub fn event() -> impl Future<Output = Event> {
+        BTN_EVENT_SIGNAL.wait()
     }
 }

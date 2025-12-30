@@ -7,7 +7,7 @@ pub mod drivers;
 pub mod util;
 
 use ch32_hal::{self as hal};
-use embassy_executor::Spawner;
+use embassy_futures::block_on;
 use panic_halt as _;
 
 use drivers::{
@@ -17,8 +17,8 @@ use drivers::{
 
 use crate::apps::main;
 
-#[embassy_executor::main(entry = "ch32_hal::entry")]
-async fn main(_spawner: Spawner) -> ! {
+#[qingke_rt::entry]
+fn main() -> ! {
     let p = hal::init(hal::Config {
         rcc: hal::rcc::Config::SYSCLK_FREQ_48MHZ_HSI,
         dma_interrupt_priority: qingke::interrupt::Priority::P0,
@@ -32,7 +32,9 @@ async fn main(_spawner: Spawner) -> ! {
 
     let mut ws2812 = drivers::ws2812::Ws2812::new(p.PC6, p.SPI1, p.DMA1_CH3);
 
-    loop {
-        main::run(&mut ws2812).await;
-    }
+    block_on(async {
+        loop {
+            main::run(&mut ws2812).await;
+        }
+    })
 }
