@@ -10,10 +10,10 @@ name = "fsei-xmas-card-25"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
 [dependencies]
-ch32-hal = { git = "https://github.com/ch32-rs/ch32-hal.git", default-features = false, features = [
-    "ch32v003f4u6",
-    "rt",
-    "memory-x",
+ch32-hal = { git = "https://github.com/lukasfink1/ch32-hal.git", branch = "use-wakers-feature", default-features = false, features = [
+        "ch32v003f4u6",
+        "rt",
+        "memory-x",
 ] }
 embassy-futures = "0.1.2"
 embassy-sync = "0.7.2"

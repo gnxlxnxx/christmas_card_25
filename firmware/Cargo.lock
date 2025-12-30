@@ -35,14 +35,13 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 [[package]]
 name = "ch32-hal"
 version = "0.1.0"
-source = "git+https://github.com/ch32-rs/ch32-hal.git#0d198c9d5199b8db943abc88bd7ed85195fdf691"
+source = "git+https://github.com/lukasfink1/ch32-hal.git?branch=use-wakers-feature#ab1623e42b595954aaf6bf78c08c8da75006fd9c"
 dependencies = [
  "bitmaps",
  "ch32-metapac",
  "critical-section",
  "embassy-futures",
  "embassy-hal-internal",
- "embassy-sync",
  "embassy-usb-driver",
  "embedded-can",
  "embedded-hal 0.2.7",
