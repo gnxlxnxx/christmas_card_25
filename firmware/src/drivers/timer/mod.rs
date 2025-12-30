@@ -17,10 +17,11 @@ use ch32_hal::{
     peripherals,
     time::Hertz,
     timer::{
-        Channel,
         low_level::{CountingMode, OutputCompareMode, Timer},
+        Channel,
     },
 };
+use qingke::riscv::interrupt::machine;
 
 static mut TIMER_DRIVER: MaybeUninit<TimerDriver> = MaybeUninit::uninit();
 
@@ -101,12 +102,15 @@ impl TimerDriver {
                     w.set_mode(1, Mode::OUTPUT_50MHZ);
                     w.set_cnf(1, Cnf::AF_OPEN_DRAIN_OUT);
                 });
-                pac::GPIOC.cfglr().modify(|w| {
-                    w.set_mode(4, Mode::OUTPUT_50MHZ);
-                    w.set_cnf(4, Cnf::AF_OPEN_DRAIN_OUT);
+                // Disable interrupts, as our USB interrupt also modified this register
+                machine::free(|| {
+                    pac::GPIOC.cfglr().modify(|w| {
+                        w.set_mode(4, Mode::OUTPUT_50MHZ);
+                        w.set_cnf(4, Cnf::AF_OPEN_DRAIN_OUT);
 
-                    w.set_mode(0, Mode::INPUT);
-                    w.set_cnf(0, Cnf::PULL_IN__AF_PUSH_PULL_OUT);
+                        w.set_mode(0, Mode::INPUT);
+                        w.set_cnf(0, Cnf::PULL_IN__AF_PUSH_PULL_OUT);
+                    })
                 });
                 pac::GPIOD.cfglr().modify(|w| {
                     w.set_mode(2, Mode::OUTPUT_50MHZ);
@@ -237,14 +241,16 @@ impl TimerDriver {
                     w.set_mode(2, Mode::OUTPUT_50MHZ);
                     w.set_cnf(2, Cnf::AF_OPEN_DRAIN_OUT);
                 });
-                pac::GPIOC.cfglr().modify(|w| {
-                    w.set_mode(1, Mode::OUTPUT_50MHZ);
-                    w.set_cnf(1, Cnf::AF_OPEN_DRAIN_OUT);
-                    w.set_mode(7, Mode::OUTPUT_50MHZ);
-                    w.set_cnf(7, Cnf::AF_OPEN_DRAIN_OUT);
+                machine::free(|| {
+                    pac::GPIOC.cfglr().modify(|w| {
+                        w.set_mode(1, Mode::OUTPUT_50MHZ);
+                        w.set_cnf(1, Cnf::AF_OPEN_DRAIN_OUT);
+                        w.set_mode(7, Mode::OUTPUT_50MHZ);
+                        w.set_cnf(7, Cnf::AF_OPEN_DRAIN_OUT);
 
-                    w.set_mode(0, Mode::OUTPUT_50MHZ);
-                    w.set_cnf(0, Cnf::ANALOG_IN__PUSH_PULL_OUT);
+                        w.set_mode(0, Mode::OUTPUT_50MHZ);
+                        w.set_cnf(0, Cnf::ANALOG_IN__PUSH_PULL_OUT);
+                    })
                 });
                 pac::GPIOD.cfglr().modify(|w| {
                     w.set_mode(0, Mode::OUTPUT_50MHZ);

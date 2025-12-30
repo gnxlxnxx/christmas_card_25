@@ -4,17 +4,18 @@
 
 pub mod apps;
 pub mod drivers;
+mod usb;
 pub mod util;
 mod vectors;
-mod usb;
 
+use ch32_hal::interrupt::InterruptExt;
 use ch32_hal::{self as hal};
 use embassy_executor::Spawner;
-use panic_halt as _;
-use usb::usb::UsbIf;
-use usb::descriptors;
 use hal::gpio::Pin;
-use ch32_hal::interrupt::InterruptExt;
+use hal::pac;
+use panic_halt as _;
+use usb::descriptors;
+use usb::usb::UsbIf;
 
 use drivers::{
     buttons::{self},
@@ -23,8 +24,9 @@ use drivers::{
 
 use crate::apps::main;
 
+use core::mem::MaybeUninit;
 // This is GPIOD, but i haven't figured out how to do this nicely yet
-static mut USB_IF: *mut UsbIf<0x4001_1000usize, 3, 2, 3> = core::ptr::null_mut();
+static mut USB_IF: MaybeUninit<UsbIf<0x4001_1000usize, 3, 2, 3>> = MaybeUninit::uninit();
 
 static mut I_MOUSE: i32 = 0;
 static mut I_KEYBOARD: i32 = 0;
@@ -102,7 +104,8 @@ async fn main(_spawner: Spawner) -> ! {
         descriptors::get_descriptor_info,
     );
 
-    unsafe { USB_IF = &mut usb as *mut _ };
+    #[allow(static_mut_refs)]
+    unsafe {USB_IF.write(usb)};
 
     let exti = &hal::pac::EXTI;
     let afio = &hal::pac::AFIO;
@@ -126,6 +129,20 @@ async fn main(_spawner: Spawner) -> ! {
     drivers::timer_init(led, btn, p.TIM1, p.TIM2);
 
     let mut ws2812 = drivers::ws2812::Ws2812::new(p.PC6, p.SPI1, p.DMA1_CH3);
+
+    // WS2812 uses some DMA interrupts internally
+    // Make the EXTI interrupt preempt all others, otherwise it might now work
+    hal::interrupt::DMA1_CHANNEL1.set_priority(hal::interrupt::Priority::P15);
+    hal::interrupt::DMA1_CHANNEL2.set_priority(hal::interrupt::Priority::P15);
+    hal::interrupt::DMA1_CHANNEL3.set_priority(hal::interrupt::Priority::P15);
+    hal::interrupt::DMA1_CHANNEL4.set_priority(hal::interrupt::Priority::P15);
+    hal::interrupt::DMA1_CHANNEL5.set_priority(hal::interrupt::Priority::P15);
+    hal::interrupt::DMA1_CHANNEL6.set_priority(hal::interrupt::Priority::P15);
+    hal::interrupt::DMA1_CHANNEL7.set_priority(hal::interrupt::Priority::P15);
+    hal::interrupt::EXTI7_0.set_priority(hal::interrupt::Priority::P0);
+    hal::interrupt::TIM1_UP.set_priority(hal::interrupt::Priority::P15);
+    unsafe { hal::interrupt::EXTI7_0.enable() };
+
     usb_dpu.set_high();
 
     loop {
@@ -136,8 +153,8 @@ async fn main(_spawner: Spawner) -> ! {
 use ch32_hal::interrupt;
 
 #[interrupt]
+#[allow(static_mut_refs)]
 fn EXTI7_0_IRQHandler() {
     // IMPORTANT: Keep latency low here
-    let data = unsafe { &mut *(USB_IF) };
-    unsafe { data.usb_interrupt_handler() };
+    unsafe { USB_IF.assume_init_mut().usb_interrupt_handler() };
 }
