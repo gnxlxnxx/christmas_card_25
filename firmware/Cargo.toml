@@ -28,6 +28,9 @@ critical-section = "1.2.0"
 qingke-rt = "0.6.1"
 qingke = { version = "0.6.1", features = [ "critical-section-impl" ] }
 
+usbd-hid = "0.9.0"
+utf16_lit = "2.0.2"
+
 [profile.dev]
 opt-level = 's'
 
