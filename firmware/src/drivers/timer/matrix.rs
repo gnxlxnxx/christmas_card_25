@@ -12,6 +12,7 @@ use ch32_hal::{
     },
     peripherals,
 };
+use embassy_time::Duration;
 
 // Gamma brightness lookup table <https://victornpb.github.io/gamma-table-generator>
 // gamma = 2.20 steps = 256 range = 0-4095
@@ -33,6 +34,8 @@ const GAMMA_LUT: [u16; 256] = [
     3079, 3109, 3140, 3170, 3201, 3232, 3263, 3295, 3326, 3358, 3390, 3421, 3454, 3486, 3518, 3551,
     3584, 3617, 3650, 3683, 3716, 3750, 3784, 3818, 3852, 3886, 3920, 3955, 3990, 4025, 4060, 4095,
 ];
+
+pub const FRAME_DURATION: Duration = Duration::from_ticks(2 * Framebuffer::HEIGHT as u64);
 
 pub(super) const MAX_PWM: u16 = GAMMA_LUT[255];
 pub(super) const ROWS: usize = 9;

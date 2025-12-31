@@ -66,7 +66,7 @@ impl Color {
     }
 
     fn gen_grb_data(&self, buf: &mut [u16; 6]) {
-        for (val, data) in self.0.iter().zip(buf.as_chunks_mut::<2>().0) {
+        for (val, data) in self.0.iter().zip(buf.chunks_exact_mut(2)) {
             data[0] = BITQUARTETS[(val >> 4) as usize];
             data[1] = BITQUARTETS[(val & 0xf) as usize];
         }

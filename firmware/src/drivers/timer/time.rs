@@ -28,7 +28,7 @@ impl Driver for TimeDriver {
         critical_section::with(|cs| self.now.borrow(cs).get())
     }
 
-    fn schedule_wake(&self, at: u64, waker: &core::task::Waker) {}
+    fn schedule_wake(&self, _at: u64, _waker: &core::task::Waker) {}
 }
 
 pub(super) fn time_driver() -> &'static TimeDriver {

@@ -3,7 +3,7 @@ use core::mem;
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
-use crate::{drivers::{buttons::{Button, Buttons, Event}, matrix::{Framebuffer, Matrix}}, util::{self, itoa::utoa10, rand::WhiteNoiseGenerator, text::{self, TEXT_BRIGHTNESS, TEXT_DURATION}}};
+use crate::{drivers::{buttons::{Button, Buttons, Event}, matrix::{self, Framebuffer, Matrix}}, util::{self, itoa::utoa10, rand::WhiteNoiseGenerator, text::{self, TEXT_BRIGHTNESS, TEXT_DURATION}}};
 
 const HEAD_BRIGHTNESS: u8 = 64;
 const SNAKE_BRIGHTNESS: u8 = 32;
@@ -152,7 +152,7 @@ impl<'a> Field<'a> {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 struct GameResult {
     pub has_won: bool,
-    pub score: u8,
+    pub score: u32,
 }
 
 #[derive(Debug)]
@@ -163,7 +163,8 @@ struct Game<'a> {
     dir_change: i32,
     length: u8,
     length_increase: u8,
-    score: u8,
+    score: u32,
+    multiplier: u32,
     head: FbCoordinate,
     tail: FbCoordinate,
 }
@@ -178,6 +179,7 @@ impl<'a> Game<'a> {
             length: 1,
             length_increase: 1,
             score: 0,
+            multiplier: 1,
             head: FbCoordinate {
                 x: 0,
                 y: (Framebuffer::HEIGHT / 2) as u8,
@@ -206,11 +208,11 @@ impl<'a> Game<'a> {
         }
     }
 
-    pub fn turn_right(&mut self) {
+    pub fn turn_cw(&mut self) {
         self.dir_change += 1;
     }
 
-    pub fn turn_left(&mut self) {
+    pub fn turn_ccw(&mut self) {
         self.dir_change -= 1;
     }
 
@@ -246,7 +248,7 @@ impl<'a> Game<'a> {
                 false
             }
             FieldState::Maultasch => {
-                self.score += 1;
+                self.score += if self.length as usize > Framebuffer::HEIGHT { self.multiplier } else { 1 };
                 self.length_increase += 2;
                 self.field.gen_maultasch(&mut self.rng);
                 self.field.set(self.head, FieldState::SnakeHead);
@@ -260,7 +262,8 @@ impl<'a> Game<'a> {
 
 pub async fn run() {
     let fb = Matrix::fb();
-    let mut clock = Ticker::every(Duration::from_millis(250));
+    let mut clock_ticks = Duration::from_millis(250).as_ticks();
+    let mut clock = Ticker::every(Duration::from_ticks(clock_ticks));
     let mut g = Game::new(&fb);
     let mut paused = false;
 
@@ -280,16 +283,24 @@ pub async fn run() {
                 } => {
                     if paused {
                         break GameResult { has_won: false, score: g.score };
+                    } else {
+                        let new_ticks = clock_ticks / 2;
+                        if new_ticks >= matrix::FRAME_DURATION.as_ticks() {
+                            g.multiplier += 1;
+
+                            clock_ticks = new_ticks;
+                            clock = Ticker::every(Duration::from_ticks(clock_ticks));
+                        }
                     }
                 }
                 Event {
                     button: Button::L,
                     pressed: true,
-                } => if !paused { g.turn_left() },
+                } => if !paused { g.turn_ccw() },
                 Event {
                     button: Button::R,
                     pressed: true,
-                } => if !paused { g.turn_right() },
+                } => if !paused { g.turn_cw() },
                 _ => (),
             }
             Either::Second(()) => {
@@ -300,32 +311,22 @@ pub async fn run() {
         }
     };
 
-    select(
-        async {
-            loop {
-                match Buttons::event().await {
-                    Event {
-                        button: Button::Start,
-                        pressed: true,
-                    } |
-                    Event {
-                        button: Button::Select,
-                        pressed: true,
-                    } => break,
-                    _ => (),
-                }
-            }
-        },
-        async {
-            let mut clock = Ticker::every(TEXT_DURATION);
+    let mut clock = Ticker::every(TEXT_DURATION);
 
-            // text::clear_scroll(&mut clock).await;
+    select(
+        wait_for_start_or_select(),
+        async {
             if res.has_won {
-                text::scroll(b"Herzlichen Gl\xFCckwunsch!", TEXT_BRIGHTNESS + 32, &mut clock).await;
+                text::scroll(b"Herzlichen Gl\xFCckwunsch!", 2 * TEXT_BRIGHTNESS, &mut clock).await;
             } else {
                 text::scroll(b"Game Over!", TEXT_BRIGHTNESS, &mut clock).await;
             }
+        }
+    ).await;
 
+    select(
+        wait_for_start_or_select(),
+        async {
             let mut itoa = [0u8; 10];
             let score_str = utoa10(res.score as u32, &mut itoa);
 
@@ -335,4 +336,20 @@ pub async fn run() {
             }
         }
     ).await;
+}
+
+async fn wait_for_start_or_select() {
+    loop {
+        match Buttons::event().await {
+            Event {
+                button: Button::Start,
+                pressed: true,
+            } |
+            Event {
+                button: Button::Select,
+                pressed: true,
+            } => break,
+            _ => (),
+        }
+    }
 }
