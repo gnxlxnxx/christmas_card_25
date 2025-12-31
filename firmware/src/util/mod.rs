@@ -1,3 +1,4 @@
+pub mod itoa;
 pub mod rand;
 pub mod sync;
 pub mod text;

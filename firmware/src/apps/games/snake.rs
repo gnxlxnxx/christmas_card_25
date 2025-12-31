@@ -3,7 +3,7 @@ use core::mem;
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
-use crate::{drivers::{buttons::{Button, Buttons, Event}, matrix::{Framebuffer, Matrix}}, util::{self, rand::WhiteNoiseGenerator}};
+use crate::{drivers::{buttons::{Button, Buttons, Event}, matrix::{Framebuffer, Matrix}}, util::{self, itoa::utoa10, rand::WhiteNoiseGenerator, text::{self, TEXT_BRIGHTNESS, TEXT_DURATION}}};
 
 const HEAD_BRIGHTNESS: u8 = 64;
 const SNAKE_BRIGHTNESS: u8 = 32;
@@ -262,25 +262,77 @@ pub async fn run() {
     let fb = Matrix::fb();
     let mut clock = Ticker::every(Duration::from_millis(250));
     let mut g = Game::new(&fb);
+    let mut paused = false;
 
     let res = loop {
         match select(Buttons::event(), clock.next()).await {
             Either::First(ev) => match  ev {
                 Event {
+                    button: Button::Start,
+                    pressed: true,
+                } => {
+                    clock.reset();
+                    paused ^= true;
+                }
+                Event {
+                    button: Button::Select,
+                    pressed: true,
+                } => {
+                    if paused {
+                        break GameResult { has_won: false, score: g.score };
+                    }
+                }
+                Event {
                     button: Button::L,
                     pressed: true,
-                } => g.turn_left(),
+                } => if !paused { g.turn_left() },
                 Event {
                     button: Button::R,
                     pressed: true,
-                } => g.turn_right(),
+                } => if !paused { g.turn_right() },
                 _ => (),
             }
             Either::Second(()) => {
-                if let Some(r) = g.advance() {
+                if !paused && let Some(r) = g.advance() {
                     break r;
                 }
             }
         }
-    }
+    };
+
+    select(
+        async {
+            loop {
+                match Buttons::event().await {
+                    Event {
+                        button: Button::Start,
+                        pressed: true,
+                    } |
+                    Event {
+                        button: Button::Select,
+                        pressed: true,
+                    } => break,
+                    _ => (),
+                }
+            }
+        },
+        async {
+            let mut clock = Ticker::every(TEXT_DURATION);
+
+            // text::clear_scroll(&mut clock).await;
+            if res.has_won {
+                text::scroll(b"Herzlichen Gl\xFCckwunsch!", TEXT_BRIGHTNESS + 32, &mut clock).await;
+            } else {
+                text::scroll(b"Game Over!", TEXT_BRIGHTNESS, &mut clock).await;
+            }
+
+            let mut itoa = [0u8; 10];
+            let score_str = utoa10(res.score as u32, &mut itoa);
+
+            loop {
+                text::scroll(b" Score: ", TEXT_BRIGHTNESS, &mut clock).await;
+                text::scroll(score_str, TEXT_BRIGHTNESS, &mut clock).await;
+            }
+        }
+    ).await;
 }

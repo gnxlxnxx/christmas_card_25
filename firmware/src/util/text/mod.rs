@@ -2,12 +2,15 @@ mod font;
 
 use core::{iter, sync::atomic::Ordering};
 
-use embassy_time::Ticker;
+use embassy_time::{Duration, Ticker};
 
 use crate::{
     drivers::matrix::{Framebuffer, Matrix},
     util::text::font::Letter,
 };
+
+pub const TEXT_DURATION: Duration = Duration::from_millis(75);
+pub const TEXT_BRIGHTNESS: u8 = 64;
 
 fn move_left(fb: &Framebuffer) {
     for row in fb.0.iter() {

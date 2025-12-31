@@ -15,15 +15,18 @@ ch32-hal = { git = "https://github.com/lukasfink1/ch32-hal.git", branch = "use-w
         "rt",
         "memory-x",
 ] }
+embedded-hal = "1.0.0"
+
 embassy-futures = "0.1.2"
 embassy-sync = "0.7.2"
 embassy-time = "0.5.0"
 embassy-time-driver = { version = "0.2.1", features = [ "tick-hz-10_000" ] }
+
+panic-halt = "1.0.0"
 critical-section = "1.2.0"
+
 qingke-rt = "0.6.1"
 qingke = { version = "0.6.1", features = [ "critical-section-impl" ] }
-embedded-hal = "1.0.0"
-panic-halt = "1.0.0"
 
 [profile.dev]
 opt-level = 's'
