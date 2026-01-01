@@ -21,7 +21,6 @@ use ch32_hal::{
         Channel,
     },
 };
-use qingke::riscv::interrupt::machine;
 
 static mut TIMER_DRIVER: MaybeUninit<TimerDriver> = MaybeUninit::uninit();
 
@@ -103,7 +102,7 @@ impl TimerDriver {
                     w.set_cnf(1, Cnf::AF_OPEN_DRAIN_OUT);
                 });
                 // Disable interrupts, as our USB interrupt also modified this register
-                machine::free(|| {
+                critical_section::with(|_| {
                     pac::GPIOC.cfglr().modify(|w| {
                         w.set_mode(4, Mode::OUTPUT_50MHZ);
                         w.set_cnf(4, Cnf::AF_OPEN_DRAIN_OUT);
@@ -241,7 +240,7 @@ impl TimerDriver {
                     w.set_mode(2, Mode::OUTPUT_50MHZ);
                     w.set_cnf(2, Cnf::AF_OPEN_DRAIN_OUT);
                 });
-                machine::free(|| {
+                critical_section::with(|_| {
                     pac::GPIOC.cfglr().modify(|w| {
                         w.set_mode(1, Mode::OUTPUT_50MHZ);
                         w.set_cnf(1, Cnf::AF_OPEN_DRAIN_OUT);

@@ -7,7 +7,7 @@ use crate::util::sync::Signal;
 
 const HIST_LOW: u16 = 80;
 const HIST_HIGH: u16 = 96;
-const FILT_LEN: u8 = 6;
+const FILT_LEN: u8 = 16;
 
 static BTN_STATE: Group<AtomicBool> = Group([
     AtomicBool::new(false),

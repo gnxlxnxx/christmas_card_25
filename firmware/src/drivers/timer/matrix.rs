@@ -156,13 +156,15 @@ impl<'a> Pins<'a> {
             w.set_mode(2, Mode::INPUT);
             w.set_cnf(2, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
         });
-        pac::GPIOC.cfglr().modify(|w| {
-            w.set_mode(1, Mode::INPUT);
-            w.set_cnf(1, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
-            w.set_mode(4, Mode::INPUT);
-            w.set_cnf(4, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
-            w.set_mode(7, Mode::INPUT);
-            w.set_cnf(7, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
+        critical_section::with(|_| {
+            pac::GPIOC.cfglr().modify(|w| {
+                w.set_mode(1, Mode::INPUT);
+                w.set_cnf(1, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
+                w.set_mode(4, Mode::INPUT);
+                w.set_cnf(4, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
+                w.set_mode(7, Mode::INPUT);
+                w.set_cnf(7, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
+            });
         });
         pac::GPIOD.cfglr().modify(|w| {
             w.set_mode(0, Mode::INPUT);
