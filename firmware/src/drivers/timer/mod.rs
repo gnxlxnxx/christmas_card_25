@@ -15,12 +15,13 @@ use ch32_hal::{
         timer::vals::{CcmrInputCcs, CcmrOutputCcs, FilterValue, Mms, Ocm, Urs},
     },
     peripherals,
-    time::Hertz,
     timer::{
         low_level::{CountingMode, OutputCompareMode, Timer},
         Channel,
     },
 };
+
+const CYCLES: u16 = 4800;
 
 static mut TIMER_DRIVER: MaybeUninit<TimerDriver> = MaybeUninit::uninit();
 
@@ -56,8 +57,6 @@ struct TimerDriver {
     tim1: Timer<'static, peripherals::TIM1>,
     tim2: Timer<'static, peripherals::TIM2>,
 
-    cycles: u16,
-
     start_cnt: u16,
     fcount: buttons::Group<u8>,
 
@@ -67,7 +66,7 @@ struct TimerDriver {
 
 impl TimerDriver {
     fn get_pwm(&self, col: usize) -> u16 {
-        Matrix::fb().get_pwm(col, self.row, self.cycles)
+        Matrix::fb().get_pwm(col, self.row, CYCLES)
     }
 
     fn setup_next_group(&mut self) -> Option<(buttons::Group<u16>, pac::timer::regs::Intfr)> {
@@ -312,11 +311,8 @@ pub fn init(
     let tim1 = Timer::new(tim1);
     let tim2 = Timer::new(tim2);
 
-    tim1.set_frequency(Hertz::khz(10));
-    tim2.set_frequency(Hertz::khz(10));
-    let cycles = tim1.get_max_compare_value() + 1;
-    assert_eq!(cycles, tim2.get_max_compare_value() + 1);
-    assert!(cycles >= matrix::MAX_PWM as u32);
+    tim1.regs_basic().atrlr().write_value(CYCLES);
+    tim2.regs_basic().atrlr().write_value(CYCLES);
 
     tim1.set_autoreload_preload(true);
     tim2.set_autoreload_preload(true);
@@ -347,8 +343,6 @@ pub fn init(
             btn,
             tim1,
             tim2,
-
-            cycles: cycles as u16,
 
             start_cnt: 0,
             fcount: buttons::Group::default(),
