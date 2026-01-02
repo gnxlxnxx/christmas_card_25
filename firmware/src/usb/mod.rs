@@ -4,7 +4,6 @@ use crate::hal;
 use crate::hal::{gpio::Pin, pac, peripherals::*, Peri};
 
 use usb::UsbIf;
-static mut I_MOUSE: i32 = 0;
 static mut I_KEYBOARD: i32 = 0;
 
 pub fn init(
@@ -27,41 +26,10 @@ pub fn init(
     let usb_if = UsbIf::new(
         |_e, _scratchpad, endp, sendtok, usbif| {
             if endp == 1 {
-                let mut tsajoystick_mouse: [u8; 4] = [0x00, 0x00, 0x00, 0x00];
-                // Mouse (4 bytes)
-                unsafe {
-                    I_MOUSE += 1;
-                    let mut mode = I_MOUSE >> 2;
-
-                    // Move the mouse right, down, left and up in a square.
-                    // if I_MOUSE & 0b11 == 0 {
-                    //     match mode & 3 {
-                    //         0 => {
-                    //             tsajoystick_mouse[1] = 1;
-                    //             tsajoystick_mouse[2] = 0;
-                    //         }
-                    //         1 => {
-                    //             tsajoystick_mouse[1] = 0;
-                    //             tsajoystick_mouse[2] = 1;
-                    //         }
-                    //         2 => {
-                    //             tsajoystick_mouse[1] = -1i8 as u8; // Need to cast to u8 for the array
-                    //             tsajoystick_mouse[2] = 0;
-                    //         }
-                    //         3 => {
-                    //             tsajoystick_mouse[1] = 0;
-                    //             tsajoystick_mouse[2] = -1i8 as u8; // Need to cast to u8 for the array
-                    //         }
-                    //         _ => {}
-                    //     }
-                    // }
-                    usbif.usb_send_data(tsajoystick_mouse.as_ptr(), 4, 0, sendtok);
-                }
-            } else if endp == 2 {
                 let mut tsajoystick_keyboard: [u8; 8] = [0x00; 8];
                 // Keyboard (8 bytes)
                 unsafe {
-                    //I_KEYBOARD += 1;
+                    I_KEYBOARD += 1;
 
                     // Press a Key every second or so.
                     // if (I_KEYBOARD & 0x7f) == 1 {

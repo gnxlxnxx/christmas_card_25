@@ -2,31 +2,6 @@ use usbd_hid::descriptor::generator_prelude::*;
 use utf16_lit::utf16;
 
 #[gen_hid_descriptor(
-    (collection = APPLICATION, usage_page = GENERIC_DESKTOP, usage = MOUSE) = {
-        (collection = PHYSICAL, usage = POINTER) = {
-            (usage_page = BUTTON, usage_min = BUTTON_1, usage_max = BUTTON_3) = {
-                #[packed_bits 3] #[item_settings data,variable,absolute] buttons=input;
-            };
-            (usage_page = GENERIC_DESKTOP,) = {
-                (usage = X,) = {#[item_settings data,variable,relative] x=input};
-                (usage = Y,) = {#[item_settings data,variable,relative] y=input};
-                (usage = WHEEL,) = {#[item_settings data,variable,relative] wheel=input};
-            }
-        }
-    }
-)]
-struct MouseReport {
-    buttons: u8,
-    x: i8,
-    y: i8,
-    wheel: i8,
-}
-// We need this value for the CONFIG_DESCRIPTOR, unfortunately there is no way
-// to get the hid descriptor statically. Thus hardcode it here and verify that it matches later on.
-// How do you get the real length without guessing? I just made a separate project that printed it
-const MOUSE_DESC_LEN: usize = 57;
-
-#[gen_hid_descriptor(
     (collection = APPLICATION, usage_page = GENERIC_DESKTOP, usage = KEYBOARD) = {
         (usage_page = KEYBOARD, usage_min = 0xE0, usage_max = 0xE7) = {
             #[packed_bits 8] #[item_settings data,variable,absolute] modifier=input;
@@ -49,6 +24,10 @@ pub struct KeyboardReport {
     pub leds: u8,
     pub keycodes: [u8; 6],
 }
+// We need this value for the CONFIG_DESCRIPTOR, unfortunately there is no way
+// to get the hid descriptor statically. Thus hardcode it here and verify that it matches later on.
+// How do you get the real length without guessing? I just made a separate project that printed it
+
 const KBD_DESC_LEN: usize = 69;
 
 #[unsafe(link_section = ".rodata")]
@@ -71,51 +50,24 @@ static DEVICE_DESCRIPTOR: [u8; 18] = [
 ];
 
 #[unsafe(link_section = ".rodata")]
-static CONFIG_DESCRIPTOR: [u8; 59] = [
+static CONFIG_DESCRIPTOR: [u8; 34] = [
     // Mostly stolen from a USB mouse I found.
     // configuration descriptor, USB spec 9.6.3, page 264-266, Table 9-10
     9, // bLength;
     2, // bDescriptorType;
-    0x3b,
+    0x22,
     0x00, // wTotalLength
-    0x02, // bNumInterfaces (Normally 1)
+    0x01, // bNumInterfaces (Normally 1)
     0x01, // bConfigurationValue
     0x00, // iConfiguration
     0x80, // bmAttributes (was 0xa0)
     0x64, // bMaxPower (200mA)
     // This descriptor shows how to embed two HIDs, to build a composite HID
     // device.
-
-    // Mouse
-    9,    // bLength
-    4,    // bDescriptorType
-    0,    // bInterfaceNumber (unused, would normally be used for HID)
-    0,    // bAlternateSetting
-    1,    // bNumEndpoints
-    0x03, // bInterfaceClass (0x03 = HID)
-    0x01, // bInterfaceSubClass
-    0x02, // bInterfaceProtocol (Mouse)
-    0,    // iInterface
-    9,    // bLength
-    0x21, // bDescriptorType (HID)
-    0x10,
-    0x01, // bcd 1.1
-    0x00, // country code
-    0x01, // Num descriptors
-    0x22, // DescriptorType[0] (HID)
-    MOUSE_DESC_LEN as u8,
-    0x00,
-    7,    // endpoint descriptor (For endpoint 1)
-    0x05, // Endpoint Descriptor (Must be 5)
-    0x81, // Endpoint Address
-    0x03, // Attributes
-    0x04,
-    0x00, // Size
-    10,   // Interval (Number of milliseconds between polls)
     // Keyboard  (It is unusual that this would be here)
     9,    // bLength
     4,    // bDescriptorType
-    1,    // bInterfaceNumber  = 1 instead of 0 -- well make it second.
+    0,    // bInterfaceNumber  = 1 instead of 0 -- well make it second.
     0,    // bAlternateSetting
     1,    // bNumEndpoints
     0x03, // bInterfaceClass (0x03 = HID)
@@ -133,7 +85,7 @@ static CONFIG_DESCRIPTOR: [u8; 59] = [
     0x00,
     7,    // endpoint descriptor (For endpoint 1)
     0x05, // Endpoint Descriptor (Must be 5)
-    0x82, // Endpoint Address
+    0x81, // Endpoint Address
     0x03, // Attributes
     0x08,
     0x00, // Size (8 bytes)
@@ -159,18 +111,17 @@ const fn make_string<const N: usize>(s: &[u16; N]) -> UsbStringDesc<N> {
 
 // Define your strings manually as UTF-16 arrays
 static STR_LANG: UsbStringDesc<1> = make_string(&[0x0409]); // English
-static STR_MANUF: UsbStringDesc<6> = make_string(&utf16!("CNLohr"));
-static STR_PROD: UsbStringDesc<8> = make_string(&utf16!("RV003USB"));
-static STR_SERIAL: UsbStringDesc<3> = make_string(&utf16!("000"));
-static STR_ERR: UsbStringDesc<3> = make_string(&utf16!("ERR"));
+static STR_MANUF: UsbStringDesc<5> = make_string(&utf16!("FS-EI"));
+static STR_PROD: UsbStringDesc<6> = make_string(&utf16!("Card25"));
+static STR_SERIAL: UsbStringDesc<0> = make_string(&utf16!(""));
+static STR_ERR: UsbStringDesc<1> = make_string(&utf16!("E"));
 
 pub fn get_descriptor_info(w_value: u32) -> (*const u8, u16) {
     let slice: &[u8] = match w_value {
         0x00000100 => &DEVICE_DESCRIPTOR,
         0x00000200 => &CONFIG_DESCRIPTOR,
         // For HID Report (0x22), we use the generated desc from the struct above
-        0x00002200 => MouseReport::desc(),
-        0x00012200 => KeyboardReport::desc(),
+        0x00002200 => KeyboardReport::desc(),
         0x00000300 => unsafe {
             // Cast struct to u8 slice for transmission
             core::slice::from_raw_parts(
@@ -185,9 +136,7 @@ pub fn get_descriptor_info(w_value: u32) -> (*const u8, u16) {
             )
         },
         0x04090302 => unsafe {
-            if MouseReport::desc().len() != MOUSE_DESC_LEN as usize
-                || KeyboardReport::desc().len() != KBD_DESC_LEN as usize
-            {
+            if KeyboardReport::desc().len() != KBD_DESC_LEN as usize {
                 core::slice::from_raw_parts(
                     &STR_ERR as *const _ as *const u8,
                     STR_ERR.b_length as usize,
