@@ -29,9 +29,8 @@ const ENDPOINT0_SIZE: u32 = 8;
 
 pub struct UsbEndpoint {
     count: u32,
-    toggle_in: u32,
-    toggle_out: u32,
-    custom: u32,
+    toggle_in: u16,
+    toggle_out: u16,
     max_len: u32,
     opaque: *const u8,
 }
@@ -41,7 +40,6 @@ impl UsbEndpoint {
             count: 0,
             toggle_in: 0,
             toggle_out: 0,
-            custom: 0,
             max_len: 0,
             opaque: core::ptr::null(),
         }
@@ -825,7 +823,7 @@ impl<const USB_BASE: usize, const DP: u8, const DM: u8, const EPS: usize>
     extern "C" fn usb_pid_handle_in(&mut self, _addr: u32, data: *mut u8, endp: u32) {
         self.current_endpoint = endp;
 
-        let e = &mut self.eps[endp as usize];
+        let e = unsafe { self.eps.get_unchecked_mut(endp as usize) };
         let sendtok = if e.toggle_in != 0 {
             0b01001011
         } else {
@@ -840,27 +838,26 @@ impl<const USB_BASE: usize, const DP: u8, const DM: u8, const EPS: usize>
             FLASH.statr().write(|w| w.set_boot_mode(true)); // 1<<14 is zero, so, boot bootloader code. Unset for user code.
 
             FLASH.ctlr().write(|w| w.set_lock(true));
-            RCC.rstsckr().modify(|w| w.set_rmvf(true));
+            RCC.rstsckr().write(|w| w.set_rmvf(true));
             // reset here
             PFIC.sctlr().write(|w| w.set_sysreset(true));
             unsafe { unreachable_unchecked() };
-        }
-        if (e.custom != 0) || (endp != 0) {
+        } else if endp != 0 {
             (self.usb_handle_user_in_request)(e, data, endp as i32, sendtok, self);
-            return;
-        }
-        let tsend = e.opaque;
-        let offset = e.count << 3;
-        let tosend = if (e.max_len - offset) > ENDPOINT0_SIZE {
-            ENDPOINT0_SIZE
         } else {
-            e.max_len - offset
-        };
-        let sendnow = tsend.wrapping_add(offset as usize);
-        if tosend <= 0 {
-            self.usb_send_empty(sendtok);
-        } else {
-            unsafe { self.usb_send_data(sendnow, tosend, 0, sendtok) };
+            let tsend = e.opaque;
+            let offset = e.count << 3;
+            let tosend = if (e.max_len - offset) > ENDPOINT0_SIZE {
+                ENDPOINT0_SIZE
+            } else {
+                e.max_len - offset
+            };
+            let sendnow = tsend.wrapping_add(offset as usize);
+            if tosend <= 0 {
+                self.usb_send_empty(sendtok);
+            } else {
+                unsafe { self.usb_send_data(sendnow, tosend, 0, sendtok) };
+            }
         }
     }
 
@@ -873,12 +870,12 @@ impl<const USB_BASE: usize, const DP: u8, const DM: u8, const EPS: usize>
     ) {
         let epno = self.current_endpoint;
 
-        let e = &mut self.eps[epno as usize];
+        let e = unsafe { self.eps.get_unchecked_mut(epno as usize) };
 
         length -= 3;
 
         // Already received this packet.
-        if e.toggle_out != which_data {
+        if e.toggle_out != which_data as u16 {
             unsafe {
                 self.usb_send_data(core::ptr::null(), 0, 2, 0xD2); // Send ACK
             }
@@ -891,10 +888,9 @@ impl<const USB_BASE: usize, const DP: u8, const DM: u8, const EPS: usize>
                 let data_u32 = data as *const u32;
                 if unsafe {
                     epno == 0
-                        && data_u32.read_unaligned() == 0xaa3412fd
-                        && (data_u32.add(1).read_unaligned() & 0x00ffffff) == 0x00ddccbb
+                        && (*data_u32) == 0xaa3412fd
+                        && (*data_u32.add(1) & 0x00ffffff) == 0x00ddccbb
                 } {
-                    e.count = 7;
                     self.reboot_armed = 2;
                 } else {
                     self.reboot_armed = 0;
@@ -907,7 +903,6 @@ impl<const USB_BASE: usize, const DP: u8, const DM: u8, const EPS: usize>
             //Send just a data packet.
             e.count = 0;
             e.opaque = core::ptr::null_mut();
-            e.custom = 0;
             e.max_len = 0;
             self.setup_request = 0;
 
