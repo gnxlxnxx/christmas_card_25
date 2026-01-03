@@ -1,13 +1,13 @@
 use crate::drivers::ws2812::{self, Color, Ws2812};
 
-pub struct FilteredWs2812<'a, 'b> {
-    ws2812: &'a mut Ws2812<'b>,
+pub struct FilteredWs2812<'a> {
+    ws2812: &'a mut Ws2812,
     output: [Color; ws2812::LEDS],
     target: [Color; ws2812::LEDS],
 }
 
-impl<'a, 'b> FilteredWs2812<'a, 'b> {
-    pub fn new(ws2812: &'a mut Ws2812<'b>) -> Self {
+impl<'a> FilteredWs2812<'a> {
+    pub fn new(ws2812: &'a mut Ws2812) -> Self {
         Self {
             ws2812,
             output: [Color::new(0, 0, 0); ws2812::LEDS],

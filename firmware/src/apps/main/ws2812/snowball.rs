@@ -5,7 +5,7 @@ use crate::util::ws2812::FilteredWs2812;
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
-pub async fn run(filt_ws2812: &mut FilteredWs2812<'_, '_>) -> ! {
+pub async fn run(filt_ws2812: &mut FilteredWs2812<'_>) -> ! {
     let mut progress_clock = Ticker::every(Duration::from_millis(1500));
     let mut update_clock = Ticker::every(Duration::from_millis(5));
     let mut noisegen = rand::WhiteNoiseGenerator::new();

@@ -12,7 +12,7 @@ pub mod ws2812;
 
 const AUTO_DURATION: Duration = Duration::from_secs(45);
 
-pub async fn run(ws2812: &mut Ws2812<'_>) {
+pub async fn run(ws2812: &mut Ws2812) {
     let ws2812_next_event = sync::Event::new();
     let matrix_next_event = sync::Event::new();
 
