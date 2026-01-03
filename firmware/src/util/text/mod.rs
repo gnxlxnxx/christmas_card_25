@@ -14,14 +14,17 @@ pub const TEXT_BRIGHTNESS: u8 = 64;
 
 fn move_left(fb: &Framebuffer) {
     for row in fb.0.iter() {
-        row.iter()
-            .zip(
-                row.iter()
-                    .skip(1)
-                    .map(|r| r.load(Ordering::Relaxed))
-                    .chain(iter::repeat(0)),
-            )
-            .for_each(|(l, r)| l.store(r, Ordering::Relaxed));
+        let len = row.len();
+        if len == 0 {
+            continue;
+        }
+
+        for i in 0..len - 1 {
+            let next_val = row[i + 1].load(Ordering::Relaxed);
+            row[i].store(next_val, Ordering::Relaxed);
+        }
+
+        row[len - 1].store(0, Ordering::Relaxed);
     }
 }
 
@@ -36,12 +39,18 @@ pub async fn clear_scroll(clock: &mut Ticker) {
 
 pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
     let fb = Matrix::fb();
+    let rows = &fb.0;
 
     move_left(fb);
     clock.next().await;
 
-    for c in text {
-        for mut col in Letter::get(*c).0 {
+    for &c in text {
+        let glyph = Letter::get(c).0;
+
+        let mut i = 0;
+        while i < 5 {
+            let mut col = glyph[i];
+
             let downshift = match Letter::downshift(col) {
                 Some(n) => n,
                 None => break,
@@ -49,15 +58,17 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
 
             move_left(fb);
 
-            for row in fb.0.iter().skip(downshift).take(fb.0.len() - 2) {
-                row.last().unwrap().store(
-                    if col & 1 != 0 { brightness } else { 0 },
-                    Ordering::Relaxed
-                );
+            for r in downshift..(rows.len() - 2) {
+                let val = if col & 1 != 0 { brightness } else { 0 };
+                rows[r]
+                    .last()
+                    .unwrap()
+                    .store(val, Ordering::Relaxed);
                 col >>= 1;
             }
 
             clock.next().await;
+            i += 1;
         }
 
         move_left(fb);
