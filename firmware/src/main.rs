@@ -52,6 +52,11 @@ fn main() -> ! {
 
     unsafe { hal::interrupt::EXTI7_0.enable() };
 
+    // WS2812 uses some DMA interrupts internally
+    // Make the EXTI interrupt preempt all others, otherwise it gets called to slow and usb doesn't work
+    hal::interrupt::DMA1_CHANNEL3.set_priority(hal::interrupt::Priority::P15);
+    hal::interrupt::EXTI7_0.set_priority(hal::interrupt::Priority::P0);
+    hal::interrupt::TIM1_UP.set_priority(hal::interrupt::Priority::P15);
     usb::usb_up(p.PC5);
 
     block_on(async {
