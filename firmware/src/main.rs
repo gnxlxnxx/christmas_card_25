@@ -7,6 +7,7 @@ pub mod drivers;
 mod usb;
 pub mod util;
 mod vectors;
+mod builtins;
 
 use ch32_hal::interrupt::InterruptExt;
 use ch32_hal::{self as hal};
