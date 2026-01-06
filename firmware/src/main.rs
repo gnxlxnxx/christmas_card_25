@@ -61,8 +61,12 @@ fn main() -> ! {
     usb::usb_up(p.PC5);
 
     block_on(async {
+#[allow(static_mut_refs)]
         loop {
+            // TODO hook up the inputs to this
+            // unsafe { USB_IF.assume_init_mut().user_state = 0b1 }; // input left
             main::run(&mut ws2812).await;
+            // unsafe { USB_IF.assume_init_mut().user_state = 0b10 }; // input right
             games::run(&mut ws2812).await;
         }
     })

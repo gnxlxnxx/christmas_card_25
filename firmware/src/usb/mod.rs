@@ -4,7 +4,6 @@ use crate::hal;
 use crate::hal::{gpio::Pin, pac, peripherals::*, Peri};
 
 use usb::UsbIf;
-static mut I_KEYBOARD: i32 = 0;
 
 pub fn init(
     dp: Peri<'static, PC3>,
@@ -22,21 +21,17 @@ pub fn init(
     let pin_number = dm.pin() as usize;
     let port_number = dm.port();
     let mut _usb_dm = hal::gpio::Input::new(dm, hal::gpio::Pull::None);
-    // NOTE needs to have a fixed address
     let usb_if = UsbIf::new(
         |_e, _scratchpad, endp, sendtok, usbif| {
             if endp == 1 {
                 let mut tsajoystick_keyboard: [u8; 8] = [0x00; 8];
                 // Keyboard (8 bytes)
+                if usbif.user_state & 0x1 != 0 {
+                    tsajoystick_keyboard[4] = 0x50; // Left
+                } else if usbif.user_state & 0x2 != 0 {
+                    tsajoystick_keyboard[4] = 0x4F; // Right
+                }
                 unsafe {
-                    I_KEYBOARD += 1;
-
-                    // Press a Key every second or so.
-                    // if (I_KEYBOARD & 0x7f) == 1 {
-                    //     tsajoystick_keyboard[4] = 0x05; // 0x05 = "b"; 0x53 = NUMLOCK; 0x39 = CAPSLOCK;
-                    // } else {
-                    //     tsajoystick_keyboard[4] = 0;
-                    // }
                     usbif.usb_send_data(tsajoystick_keyboard.as_ptr(), 8, 0, sendtok);
                 }
             } else {
