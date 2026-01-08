@@ -309,8 +309,8 @@ pub fn init(
     let tim1 = Timer::new(tim1);
     let tim2 = Timer::new(tim2);
 
-    tim1.regs_basic().atrlr().write_value(CYCLES);
-    tim2.regs_basic().atrlr().write_value(CYCLES);
+    tim1.regs_basic().atrlr().write_value(CYCLES - 1);
+    tim2.regs_basic().atrlr().write_value(CYCLES - 1);
 
     tim1.regs_gp16().chctlr_output(0).write(|w| {
         w.set_ocm(0, Ocm::PWMMODE2);
