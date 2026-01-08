@@ -58,7 +58,7 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
 
             move_left(fb);
 
-            for r in downshift..(rows.len() - 2) {
+            for r in downshift..rows.len() {
                 let val = if col & 1 != 0 { brightness } else { 0 };
                 rows[r]
                     .last()
