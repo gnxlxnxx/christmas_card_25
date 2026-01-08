@@ -12,12 +12,11 @@ use ch32_hal::{
     pac::{
         self,
         gpio::vals::{Cnf, Mode},
-        timer::vals::{CcmrInputCcs, CcmrOutputCcs, FilterValue, Mms, Ocm, Urs},
+        timer::vals::{CcmrInputCcs, CcmrOutputCcs, Cms, Dir, FilterValue, Mms, Ocm, Urs},
     },
     peripherals,
     timer::{
-        low_level::{CountingMode, OutputCompareMode, Timer},
-        Channel,
+        Channel, low_level::{CountingMode, OutputCompareMode, Timer}
     },
 };
 
@@ -100,7 +99,6 @@ impl TimerDriver {
                     w.set_mode(1, Mode::OUTPUT_50MHZ);
                     w.set_cnf(1, Cnf::AF_OPEN_DRAIN_OUT);
                 });
-                // Disable interrupts, as our USB interrupt also modified this register
                 critical_section::with(|_| {
                     pac::GPIOC.cfglr().modify(|w| {
                         w.set_mode(4, Mode::OUTPUT_50MHZ);
@@ -314,27 +312,39 @@ pub fn init(
     tim1.regs_basic().atrlr().write_value(CYCLES);
     tim2.regs_basic().atrlr().write_value(CYCLES);
 
-    tim1.set_autoreload_preload(true);
-    tim2.set_autoreload_preload(true);
+    tim1.regs_gp16().chctlr_output(0).write(|w| {
+        w.set_ocm(0, Ocm::PWMMODE2);
+        w.set_ocm(1, Ocm::PWMMODE2);
+    });
+    tim1.regs_gp16().chctlr_output(1).write(|w| {
+        w.set_ocm(1, Ocm::PWMMODE2);
+    });
+    tim1.regs_advanced().bdtr().write(|w| w.set_moe(true));
 
-    tim1.set_counting_mode(CountingMode::EdgeAlignedUp);
-    tim2.set_counting_mode(CountingMode::EdgeAlignedUp);
-
-    tim1.set_output_compare_mode(Channel::Ch1, OutputCompareMode::PwmMode2);
-    tim1.set_output_compare_mode(Channel::Ch2, OutputCompareMode::PwmMode2);
-    tim1.set_output_compare_mode(Channel::Ch4, OutputCompareMode::PwmMode2);
-    tim1.set_moe(true);
-
-    // Trigger TIM1_UP interrupt on timer overflow
-    tim1.regs_gp16().ctlr1().modify(|w| w.set_urs(Urs::COUNTERONLY));
-    tim1.enable_update_interrupt(true);
+    // Enable interrupt
+    tim1.regs_basic().dmaintenr().modify(|r| r.set_uie(true));
 
     // Configure tim2 as slave of tim1 (tim1 enable also controls tim2)
     tim1.regs_gp16().ctlr2().modify(|w| w.set_mms(Mms::ENABLE));
     tim2.regs_gp16().smcfgr().modify(|w| w.set_sms(0b101));
-    tim2.start();
 
-    tim1.start();
+    tim2.regs_basic().ctlr1().write(|w| {
+        w.set_arpe(true);
+        w.set_dir(Dir::UP);
+        w.set_cms(Cms::EDGEALIGNED);
+
+        w.set_cen(true);
+    });
+
+    tim1.regs_basic().ctlr1().write(|w| {
+        w.set_arpe(true);
+        w.set_dir(Dir::UP);
+        w.set_cms(Cms::EDGEALIGNED);
+
+        w.set_urs(Urs::COUNTERONLY); // Trigger interrupt only on overflow
+
+        w.set_cen(true);
+    });
 
     unsafe {
         #[allow(static_mut_refs)]
