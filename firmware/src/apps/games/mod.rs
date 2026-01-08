@@ -63,7 +63,7 @@ enum Game {
 }
 
 impl Game {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self::Tetris
     }
 
@@ -74,10 +74,17 @@ impl Game {
         }
     }
 
-    pub fn to_str(&self) -> &'static [u8] {
+    pub const fn to_str(&self) -> &'static [u8] {
         match self {
             Self::Tetris => b"Tetris",
             Self::Snake => b"Snake",
+        }
+    }
+
+    pub const fn high_score_index(&self) -> usize {
+        match self {
+            Self::Tetris => 0,
+            Self::Snake => 1,
         }
     }
 
