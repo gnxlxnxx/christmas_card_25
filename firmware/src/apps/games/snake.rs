@@ -311,45 +311,5 @@ pub async fn run() {
         }
     };
 
-    let mut clock = Ticker::every(TEXT_DURATION);
-
-    select(
-        wait_for_start_or_select(),
-        async {
-            if res.has_won {
-                text::scroll(b"Herzlichen Gl\xFCckwunsch!", 2 * TEXT_BRIGHTNESS, &mut clock).await;
-            } else {
-                text::scroll(b"Game Over!", TEXT_BRIGHTNESS, &mut clock).await;
-            }
-        }
-    ).await;
-
-    select(
-        wait_for_start_or_select(),
-        async {
-            let mut itoa = [0u8; 10];
-            let score_str = utoa10(res.score as u32, &mut itoa);
-
-            loop {
-                text::scroll(b" Score: ", TEXT_BRIGHTNESS, &mut clock).await;
-                text::scroll(score_str, TEXT_BRIGHTNESS, &mut clock).await;
-            }
-        }
-    ).await;
-}
-
-async fn wait_for_start_or_select() {
-    loop {
-        match Buttons::event().await {
-            Event {
-                button: Button::Start,
-                pressed: true,
-            } |
-            Event {
-                button: Button::Select,
-                pressed: true,
-            } => break,
-            _ => (),
-        }
-    }
+    super::show_score(res.has_won, res.score).await;
 }

@@ -69,7 +69,7 @@ impl Piece {
     }
 }
 
-pub struct Tetris<'a> {
+struct Tetris<'a> {
     board: [[u8; Framebuffer::WIDTH]; Framebuffer::HEIGHT],
     current: Piece,
     rng: WhiteNoiseGenerator,
@@ -253,13 +253,5 @@ pub async fn run() {
         game.draw();
     };
 
-    let mut clock = Ticker::every(TEXT_DURATION);
-
-    text::scroll(b"Game Over!", TEXT_BRIGHTNESS, &mut clock).await;
-
-    let mut itoa = [0u8; 10];
-    let score_str = utoa10(res.score as u32, &mut itoa);
-
-    text::scroll(b" Score: ", TEXT_BRIGHTNESS, &mut clock).await;
-    text::scroll(score_str, TEXT_BRIGHTNESS, &mut clock).await;
+    super::show_score(false, res.score).await;
 }
