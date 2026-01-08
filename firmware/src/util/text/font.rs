@@ -1,16 +1,15 @@
-// TODO: 9 height font idea:
 // 00-7f: fill col from row 0 (top)
 // 80:    mark end of character
 // 81-ff: fill col from row 2
 
-const ASCII_PRINTABLE: [Letter; 95] = [
-    // SPACE
+const LETTERS: [Letter; 100] = [
+    // ' '
     Letter([
         0b00000000,
         Letter::END_MARKER,
         0, 0, 0,
     ]),
-    // EXCL
+    // !
     Letter([
         0b01011111,
         Letter::END_MARKER,
@@ -120,7 +119,7 @@ const ASCII_PRINTABLE: [Letter; 95] = [
         Letter::END_MARKER,
         0,
     ]),
-    // 0,
+    // 0
     Letter([
         0b00111110,
         0b01010001,
@@ -739,6 +738,46 @@ const ASCII_PRINTABLE: [Letter; 95] = [
         0b00010000,
         0b00001000,
     ]),
+    // Uni Stuttgart
+    Letter([
+        0b00001000,
+        0b00100010,
+        0b00001000,
+        0b00100010,
+        0b00001000,
+    ]),
+    // ä
+    Letter([
+        0b00100001,
+        0b01010100,
+        0b01010100,
+        0b01111001,
+        Letter::END_MARKER,
+    ]),
+    // ö
+    Letter([
+        0b00111001,
+        0b01000100,
+        0b01000100,
+        0b00111001,
+        Letter::END_MARKER,
+    ]),
+    // ü
+    Letter([
+        0b00111101,
+        0b01000000,
+        0b01000000,
+        0b01111101,
+        Letter::END_MARKER,
+    ]),
+    // ß
+    Letter([
+        0b01111110,
+        0b00000001,
+        0b00000101,
+        0b01001010,
+        0b00110000,
+    ]),
 ];
 
 const LETTER_UNKNOWN: Letter = Letter([
@@ -749,46 +788,6 @@ const LETTER_UNKNOWN: Letter = Letter([
     0b01111111,
 ]);
 
-const LETTER_UE: Letter = Letter([
-    0b00111101,
-    0b01000000,
-    0b01000000,
-    0b01111101,
-    Letter::END_MARKER,
-]);
-
-const LETTER_OE: Letter = Letter([
-    0b00111001,
-    0b01000100,
-    0b01000100,
-    0b00111001,
-    Letter::END_MARKER,
-]);
-
-const LETTER_AE: Letter = Letter([
-    0b00100001,
-    0b01010100,
-    0b01010100,
-    0b01111001,
-    Letter::END_MARKER,
-]);
-
-const LETTER_SZ: Letter = Letter([
-    0b01111110,
-    0b00000001,
-    0b00000101,
-    0b01001010,
-    0b00110000,
-]);
-
-const LETTER_UNI_STUTTGART: Letter = Letter([
-    0b00001000,
-    0b00100010,
-    0b00001000,
-    0b00100010,
-    0b00001000,
-]);
-
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Default)]
 pub struct Letter(pub [u8; Self::MAX_WIDTH]);
 
@@ -796,16 +795,8 @@ impl Letter {
     pub const MAX_WIDTH: usize = 5;
     pub const END_MARKER: u8 = 0x80;
 
-    pub const fn get(c: u8) -> &'static Letter {
-        match c {
-            c if b' ' <= c && c <= b'~' => &ASCII_PRINTABLE[(c - b' ') as usize],
-            b'\xdc' | b'\xfc' => &LETTER_UE,
-            b'\xd6' | b'\xf6' => &LETTER_OE,
-            b'\xc4' | b'\xe4' => &LETTER_AE,
-            b'\xdf' => &LETTER_SZ,
-            b'\x80' => &LETTER_UNI_STUTTGART,
-            _ => &LETTER_UNKNOWN,
-        }
+    pub fn get(c: u8) -> &'static Letter {
+        LETTERS.get((c - b' ') as usize).unwrap_or(&LETTER_UNKNOWN)
     }
 
     pub const fn downshift(col: u8) -> Option<usize> {

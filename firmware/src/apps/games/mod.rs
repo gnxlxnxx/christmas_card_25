@@ -13,7 +13,7 @@ async fn show_score(has_won: bool, score: u32, high_score: u32) {
         wait_for_start_or_select(),
         async {
             if has_won {
-                text::scroll(b"Herzlichen Gl\xFCckwunsch!", 2 * TEXT_BRIGHTNESS, &mut clock).await;
+                text::scroll(b"Herzlichen Gl\x82ckwunsch!", 2 * TEXT_BRIGHTNESS, &mut clock).await;
             } else {
                 text::scroll(b"Game Over!", TEXT_BRIGHTNESS, &mut clock).await;
             }

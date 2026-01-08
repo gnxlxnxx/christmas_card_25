@@ -39,7 +39,6 @@ pub async fn clear_scroll(clock: &mut Ticker) {
 
 pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
     let fb = Matrix::fb();
-    let rows = &fb.0;
 
     move_left(fb);
     clock.next().await;
@@ -58,14 +57,12 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
 
             move_left(fb);
 
-            for r in downshift..rows.len() {
+            for r in downshift..fb.0.len() {
                 let val = if col & 1 != 0 { brightness } else { 0 };
-                rows[r]
-                    .last()
-                    .unwrap()
-                    .store(val, Ordering::Relaxed);
+                fb.0[r].last().unwrap().store(val, Ordering::Relaxed);
                 col >>= 1;
             }
+
 
             clock.next().await;
             i += 1;
