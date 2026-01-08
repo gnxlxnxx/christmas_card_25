@@ -36,7 +36,7 @@ fn main() -> ! {
 
     // It's enabled by the hal
     // We don't want an interrupt before we're ready
-    unsafe { hal::interrupt::EXTI7_0.disable() };
+    hal::interrupt::EXTI7_0.disable();
 
     let usb = usb::init(p.PC3, p.PC2, &mut hal::pac::AFIO, &mut hal::pac::EXTI, &mut hal::pac::SYSTICK);
     #[allow(static_mut_refs)]
@@ -57,16 +57,13 @@ fn main() -> ! {
     // Make the EXTI interrupt preempt all others, otherwise it gets called to slow and usb doesn't work
     hal::interrupt::DMA1_CHANNEL3.set_priority(hal::interrupt::Priority::P15);
     hal::interrupt::EXTI7_0.set_priority(hal::interrupt::Priority::P0);
-    hal::interrupt::TIM1_UP.set_priority(hal::interrupt::Priority::P15);
+    hal::interrupt::TIM1_UP.set_priority(hal::interrupt::Priority::P14);
     usb::usb_up(p.PC5);
 
     block_on(async {
-#[allow(static_mut_refs)]
         loop {
             // TODO hook up the inputs to this
-            // unsafe { USB_IF.assume_init_mut().user_state = 0b1 }; // input left
             main::run(&mut ws2812).await;
-            // unsafe { USB_IF.assume_init_mut().user_state = 0b10 }; // input right
             games::run(&mut ws2812).await;
         }
     })

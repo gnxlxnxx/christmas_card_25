@@ -6,7 +6,7 @@ use crate::{drivers::{buttons::{Button, Buttons, Event}, ws2812::Ws2812}, util::
 pub mod snake;
 pub mod tetris;
 
-async fn show_score(has_won: bool, score: u32) {
+async fn show_score(has_won: bool, score: u32, high_score: u32) {
     let mut clock = Ticker::every(TEXT_DURATION);
 
     select(
@@ -23,12 +23,17 @@ async fn show_score(has_won: bool, score: u32) {
     select(
         wait_for_start_or_select(),
         async {
-            let mut itoa = [0u8; 10];
-            let score_str = utoa10(score as u32, &mut itoa);
+            let mut itoa_score = [0u8; 10];
+            let mut itoa_hs = [0u8; 10];
+
+            let score_str = utoa10(score, &mut itoa_score);
+            let hs_str = utoa10(high_score, &mut itoa_hs);
 
             loop {
                 text::scroll(b" Score: ", TEXT_BRIGHTNESS, &mut clock).await;
                 text::scroll(score_str, TEXT_BRIGHTNESS, &mut clock).await;
+                text::scroll(b" High Score: ", TEXT_BRIGHTNESS, &mut clock).await;
+                text::scroll(hs_str, TEXT_BRIGHTNESS, &mut clock).await;
             }
         }
     ).await;

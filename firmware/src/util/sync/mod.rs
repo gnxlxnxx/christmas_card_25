@@ -64,3 +64,7 @@ impl<M: RawMutex, T> Signal<M, T> {
         })
     }
 }
+
+pub fn poll_while(mut f: impl FnMut() -> bool) -> impl Future<Output = ()> {
+    poll_fn(move |_| if f() { Poll::Pending } else { Poll::Ready(()) })
+}

@@ -3,7 +3,7 @@ use core::mem;
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
-use crate::{drivers::{buttons::{Button, Buttons, Event}, matrix::{self, Framebuffer, Matrix}}, util::{self, itoa::utoa10, rand::WhiteNoiseGenerator, text::{self, TEXT_BRIGHTNESS, TEXT_DURATION}}};
+use crate::{drivers::{buttons::{Button, Buttons, Event}, flash, matrix::{self, Framebuffer, Matrix}}, util::{self, itoa::utoa10, rand::WhiteNoiseGenerator, text::{self, TEXT_BRIGHTNESS, TEXT_DURATION}}};
 
 const HEAD_BRIGHTNESS: u8 = 64;
 const SNAKE_BRIGHTNESS: u8 = 32;
@@ -311,5 +311,7 @@ pub async fn run() {
         }
     };
 
-    super::show_score(res.has_won, res.score).await;
+    let hs = flash::new_high_score(1, res.score).await;
+
+    super::show_score(res.has_won, res.score, hs).await;
 }

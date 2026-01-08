@@ -1,4 +1,5 @@
 use crate::drivers::buttons::{Button, Buttons, Event};
+use crate::drivers::flash;
 use crate::matrix::{Framebuffer, Matrix};
 use crate::util::{
     itoa::utoa10,
@@ -253,5 +254,7 @@ pub async fn run() {
         game.draw();
     };
 
-    super::show_score(false, res.score).await;
+    let hs = flash::new_high_score(0, res.score).await;
+
+    super::show_score(false, res.score, hs).await;
 }

@@ -180,9 +180,15 @@ impl<'a> Pins<'a> {
 
     pub(super) fn set_high(&mut self, row: usize) {
         let pin = &self.0[row];
-        pac::GPIO(pin.port().into()).cfglr().modify(|w| {
-            w.set_mode(pin.pin().into(), Mode::OUTPUT_50MHZ);
-            w.set_cnf(pin.pin().into(), Cnf::ANALOG_IN__PUSH_PULL_OUT);
+
+        let port = pin.port().into();
+        let pin = pin.pin().into();
+
+        critical_section::with(|_| {
+            pac::GPIO(port).cfglr().modify(|w| {
+                w.set_mode(pin, Mode::OUTPUT_50MHZ);
+                w.set_cnf(pin, Cnf::ANALOG_IN__PUSH_PULL_OUT);
+            });
         });
     }
 }

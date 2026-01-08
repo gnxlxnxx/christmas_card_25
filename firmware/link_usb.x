@@ -66,6 +66,12 @@ SECTIONS
         . = ALIGN(4);
     } >FLASH AT>FLASH
 
+    .highscore : ALIGN(64)
+    {
+        *(.highscore .highscore.*);
+        . = ALIGN(64);
+    } >FLASH AT>FLASH
+
     .data : ALIGN(4)
     {
         _data_lma = LOADADDR(.data);
