@@ -2,7 +2,7 @@ use ch32_hal as hal;
 use hal::spi::{Config, Spi};
 use hal::{Peri, peripherals};
 use hal::pac;
-use crate::util::sync::Event;
+use crate::util::sync::{Event, poll_while};
 use hal::interrupt;
 use hal::interrupt::InterruptExt;
 
@@ -81,7 +81,6 @@ pub struct Ws2812 {
     //spi: Spi<'a, peripherals::SPI1, ch32_hal::mode::Async>,
 }
 
-static SPI_DMA_EVENT: Event =  Event::new();
 // I have 2 leading and one trailing led full of '0's
 static mut SPI_DMA_TRANSFER_BUFFER: [[u16; 6]; LEDS + 3] = [[0u16; 6]; LEDS + 3];
 
@@ -92,7 +91,10 @@ impl Ws2812 {
         _dma1_ch3: Peri<'static, peripherals::DMA1_CH3>,
     ) -> Self {
         // Remap is implicitly set as 0
-        pac::GPIOC.cfglr().modify(|w| {w.set_mode(6, pac::gpio::vals::Mode::OUTPUT_10MHZ); w.set_cnf(6, pac::gpio::vals::Cnf::PULL_IN__AF_PUSH_PULL_OUT);});
+        pac::GPIOC.cfglr().modify(|w| {
+            w.set_mode(6, pac::gpio::vals::Mode::OUTPUT_10MHZ);
+            w.set_cnf(6, pac::gpio::vals::Cnf::PULL_IN__AF_PUSH_PULL_OUT);
+        });
 
 
         pac::RCC.ahbpcenr().modify(|w| w.set_dma1en(true));
@@ -140,21 +142,14 @@ impl Ws2812 {
             w.set_minc(true); // Increase memory address
             w.set_dir(pac::dma::vals::Dir::FROMMEMORY);
             w.set_teie(false); // no interrupt on errror
-            w.set_tcie(true); // interrupt on tx complete
+            w.set_tcie(false); // interrupt on tx complete
             w.set_htie(false); // no interrupt half
             w.set_circ(false); // circular
             //w.set_pl(options.priority.into()); // priority
             w.set_en(true); // and start
         });
 
-        SPI_DMA_EVENT.wait().await;
         // Wait for the SPI to be done
-        while pac::SPI1.statr().read().bsy() {}
+        poll_while(|| pac::SPI1.statr().read().bsy()).await;
     }
-}
-
-#[interrupt]
-fn DMA1_CHANNEL3_IRQHandler() {
-    pac::DMA1.ifcr().write(|w| w.set_gif(3-1, true));
-    SPI_DMA_EVENT.trigger();
 }

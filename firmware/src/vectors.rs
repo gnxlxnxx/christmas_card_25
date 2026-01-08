@@ -8,7 +8,7 @@ mod _vectors {
         fn AWU();
         fn DMA1_CHANNEL1();
         fn DMA1_CHANNEL2();
-        fn DMA1_CHANNEL3_IRQHandler();
+        fn DMA1_CHANNEL3();
         fn DMA1_CHANNEL4();
         fn DMA1_CHANNEL5();
         fn DMA1_CHANNEL6();
@@ -46,7 +46,7 @@ mod _vectors {
             _handler: DMA1_CHANNEL2,
         },
         Vector {
-            _handler: DMA1_CHANNEL3_IRQHandler,
+            _handler: DMA1_CHANNEL3,
         },
         Vector {
             _handler: DMA1_CHANNEL4,
