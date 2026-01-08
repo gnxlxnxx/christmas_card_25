@@ -1,4 +1,4 @@
-use embassy_futures::select::select;
+use embassy_futures::select::{Either, select};
 use embassy_time::Ticker;
 
 use crate::{drivers::{buttons::{Button, Buttons, Event}, ws2812::Ws2812}, util::{itoa::utoa10, text::{self, TEXT_BRIGHTNESS, TEXT_DURATION}}};
@@ -52,7 +52,65 @@ async fn wait_for_start_or_select() {
     }
 }
 
+enum Game {
+    Tetris,
+    Snake,
+}
+
+impl Game {
+    pub fn new() -> Self {
+        Self::Tetris
+    }
+
+    pub fn next(&mut self) {
+        *self = match self {
+            Self::Tetris => Self::Snake,
+            Self::Snake => Self::Tetris,
+        }
+    }
+
+    pub fn to_str(&self) -> &'static [u8] {
+        match self {
+            Self::Tetris => b"Tetris",
+            Self::Snake => b"Snake",
+        }
+    }
+
+    pub async fn run(&self) {
+        match self {
+            Self::Tetris => tetris::run().await,
+            Self::Snake => snake::run().await,
+        }
+    }
+}
+
 pub async fn run(ws2812: &mut Ws2812) {
-    tetris::run().await;
-    snake::run().await;
+    let mut game = Game::new();
+
+    loop {
+        let mut clock = Ticker::every(TEXT_DURATION);
+
+        match select(
+            Buttons::event(),
+            async {
+                text::clear_scroll(&mut clock).await;
+                text::scroll(game.to_str(), TEXT_BRIGHTNESS, &mut clock).await;
+            }
+        ).await {
+            Either::First(ev) => match ev {
+                Event {
+                    button: Button::Start,
+                    pressed: true,
+                } => break,
+                Event {
+                    button: _,
+                    pressed: true,
+                } => game.next(),
+                _ => (),
+            }
+            Either::Second(()) => (),
+        }
+    }
+
+    game.run().await;
 }
