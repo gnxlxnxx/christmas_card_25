@@ -60,7 +60,6 @@ pub struct UsbIf<const USB_BASE: usize, const DP: u8, const DM: u8, const EPS: u
     reboot_armed: u32,
     last_se0_cyccount: u32,
     se0_windup: i32,
-    pub user_state: u8, // NOTE: For a more generic implementation this could be generic
     usb_handle_user_in_request: fn(*mut UsbEndpoint, *mut u8, i32, u32, &mut Self),
     get_descriptor_info: fn(u32) -> (*const u8, u16),
     eps: [UsbEndpoint; EPS], // ENDPOINTS
@@ -80,7 +79,6 @@ impl<const USB_BASE: usize, const DP: u8, const DM: u8, const EPS: usize>
             reboot_armed: 0,
             last_se0_cyccount: 0,
             se0_windup: 0,
-            user_state: 0,
             usb_handle_user_in_request,
             get_descriptor_info,
             eps: [const { UsbEndpoint::new() }; EPS],

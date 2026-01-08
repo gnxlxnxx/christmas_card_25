@@ -1,5 +1,6 @@
 pub mod descriptors;
 pub mod usb;
+use crate::drivers::buttons::{Button, Buttons};
 use crate::hal;
 use crate::hal::{gpio::Pin, pac, peripherals::*, Peri};
 
@@ -25,11 +26,13 @@ pub fn init(
         |_e, _scratchpad, endp, sendtok, usbif| {
             if endp == 1 {
                 let mut tsajoystick_keyboard: [u8; 8] = [0x00; 8];
+                let mut nextkc = tsajoystick_keyboard.iter_mut().skip(2);
                 // Keyboard (8 bytes)
-                if usbif.user_state & 0x1 != 0 {
-                    tsajoystick_keyboard[4] = 0x50; // Left
-                } else if usbif.user_state & 0x2 != 0 {
-                    tsajoystick_keyboard[4] = 0x4F; // Right
+                if Buttons::get(Button::R) {
+                    *nextkc.next().unwrap() = 0x4f; // Right
+                }
+                if Buttons::get(Button::L) {
+                    *nextkc.next().unwrap() = 0x50; // Left
                 }
                 unsafe {
                     usbif.usb_send_data(tsajoystick_keyboard.as_ptr(), 8, 0, sendtok);

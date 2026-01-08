@@ -112,7 +112,7 @@ const fn make_string<const N: usize>(s: &[u16; N]) -> UsbStringDesc<N> {
 // Define your strings manually as UTF-16 arrays
 static STR_LANG: UsbStringDesc<1> = make_string(&[0x0409]); // English
 static STR_MANUF: UsbStringDesc<5> = make_string(&utf16!("FS-EI"));
-static STR_PROD: UsbStringDesc<6> = make_string(&utf16!("Card25"));
+static STR_PROD: UsbStringDesc<12> = make_string(&utf16!("Xmas Card 25"));
 static STR_SERIAL: UsbStringDesc<0> = make_string(&utf16!(""));
 static STR_ERR: UsbStringDesc<1> = make_string(&utf16!("E"));
 
