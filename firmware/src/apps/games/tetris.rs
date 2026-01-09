@@ -32,8 +32,8 @@ impl Piece {
         let mut max_y = 0;
         for i in 0..16 {
             if (self.shape >> i) & 1 == 1 {
-                let x = (i & 3) as u8;
-                let y = (i >> 2) as u8;
+                let x = (i % 4) as u8;
+                let y = (i / 4) as u8;
                 if x < min_x {
                     min_x = x;
                 }
@@ -54,14 +54,14 @@ impl Piece {
     fn rotate(&mut self, cw: bool) {
         let mut out = 0;
         for i in 0..16 {
-            let x = (i & 3) as u8;
-            let y = (i >> 2) as u8;
+            let x = i % 4;
+            let y = i / 4;
 
-            let src = (y << 2) + x; // y*4 + x
+            let src = y * 4 + x;
             let dst = if cw {
-                (x << 2) + (3 - y) // x*4 + (3-y)
+                x * 4 + 3 - y
             } else {
-                ((3 - x) << 2) + y // (3-x)*4 + y
+                (3 - x) * 4 + y
             };
 
             out |= ((self.shape >> src) & 1) << dst;
@@ -121,8 +121,8 @@ impl<'a> Tetris<'a> {
                 continue;
             }
 
-            let px = p.x + ((i as u8) & 3); // funny %4
-            let py = p.y + ((i as u8) >> 2); // funny /4
+            let px = p.x + ((i as u8) % 4);
+            let py = p.y + ((i as u8) / 4);
 
             if py >= HEIGHT || px >= WIDTH {
                 return true;
@@ -142,7 +142,7 @@ impl<'a> Tetris<'a> {
                 continue;
             }
 
-            let x = p.x + (i & 3) as u8;
+            let x = p.x + (i % 4) as u8;
             let y = p.y + (i >> 2) as u8;
             if x < WIDTH && y < HEIGHT {
                 self.board[y as usize][x as usize] = 1;
@@ -222,8 +222,8 @@ impl<'a> Tetris<'a> {
             if (p.shape >> i) & 1 == 0 {
                 continue;
             }
-            let x = p.x + (i & 3) as u8;
-            let y = p.y + (i >> 2) as u8;
+            let x = p.x + (i % 4) as u8;
+            let y = p.y + (i / 4) as u8;
 
             if x < WIDTH && y < HEIGHT {
                 self.fb.store(x as usize, y as usize, 100);
