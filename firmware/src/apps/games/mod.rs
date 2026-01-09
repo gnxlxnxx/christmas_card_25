@@ -3,7 +3,7 @@ use embassy_time::Ticker;
 
 use crate::{drivers::{buttons::{Button, Buttons, Event}, ws2812::Ws2812}, util::{itoa::utoa10, text::{self, TEXT_BRIGHTNESS, TEXT_DURATION}}};
 
-const HIGH_SCORE_TEXT: &[u8; 13] = b" High Score: ";
+const HIGH_SCORE_TEXT: &[u8] = b" High Score: ";
 
 pub mod snake;
 pub mod tetris;
