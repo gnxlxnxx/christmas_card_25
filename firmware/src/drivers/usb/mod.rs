@@ -57,14 +57,13 @@ pub fn init(
         descriptors::get_descriptor_info,
     );
 
-    pac::AFIO.exticr()
-        .modify(|w| w.set_exti(pin_number, port_number));
+    pac::AFIO
+        .exticr()
+        .write(|w| w.set_exti(pin_number, port_number));
     //Warning: The interrupts perform HSI trimming and should run with 48MHz HSI settings
     pac::EXTI.intenr().write(|w| w.set_mr(pin_number, true)); // enable interrupt
     pac::EXTI.ftenr().write(|w| w.set_tr(pin_number, true));
     pac::EXTI.rtenr().write(|w| w.set_tr(pin_number, false));
-    pac::AFIO.exticr()
-        .modify(|w| w.set_exti(pin_number, port_number));
 
     unsafe {
         #[allow(static_mut_refs)]
