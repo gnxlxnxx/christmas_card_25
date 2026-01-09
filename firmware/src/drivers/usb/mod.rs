@@ -4,16 +4,28 @@ use crate::drivers::buttons::{Button, Buttons};
 use crate::hal;
 use crate::hal::{gpio::Pin, pac, peripherals::*, Peri};
 
+use ch32_hal::interrupt::InterruptExt;
+use qingke_rt::interrupt;
 use usb::UsbIf;
+
+use core::mem::MaybeUninit;
+// This is GPIOD, but i haven't figured out how to do this nicely yet
+static mut USB_IF: MaybeUninit<UsbIf<0x4001_1000usize, 3, 2, 3>> = MaybeUninit::uninit();
+
+#[interrupt]
+fn EXTI7_0_IRQHandler() {
+    // IMPORTANT: Keep latency low here
+    #[allow(static_mut_refs)]
+    unsafe { USB_IF.assume_init_mut().usb_interrupt_handler() };
+}
 
 pub fn init(
     dp: Peri<'static, PC3>,
     dm: Peri<'static, PC2>,
-    afio: &mut hal::pac::afio::Afio,
-    exti: &mut hal::pac::exti::Exti,
-    systick: &mut hal::pac::systick::Systick,
-) -> UsbIf<0x4001_1000usize, 3, 2, 3> {
-    systick.ctlr().write(|w| {
+    _afio: Peri<'static, AFIO>,
+    _systick: Peri<'static, SYSTICK>,
+) {
+    pac::SYSTICK.ctlr().write(|w| {
         w.set_stclk(pac::systick::vals::Stclk::HCLK);
         w.set_ste(true);
     });
@@ -45,15 +57,21 @@ pub fn init(
         descriptors::get_descriptor_info,
     );
 
-    afio.exticr()
+    pac::AFIO.exticr()
         .modify(|w| w.set_exti(pin_number, port_number));
     //Warning: The interrupts perform HSI trimming and should run with 48MHz HSI settings
-    exti.intenr().write(|w| w.set_mr(pin_number, true)); // enable interrupt
-    exti.ftenr().write(|w| w.set_tr(pin_number, true));
-    exti.rtenr().write(|w| w.set_tr(pin_number, false));
-    afio.exticr()
+    pac::EXTI.intenr().write(|w| w.set_mr(pin_number, true)); // enable interrupt
+    pac::EXTI.ftenr().write(|w| w.set_tr(pin_number, true));
+    pac::EXTI.rtenr().write(|w| w.set_tr(pin_number, false));
+    pac::AFIO.exticr()
         .modify(|w| w.set_exti(pin_number, port_number));
-    usb_if
+
+    unsafe {
+        #[allow(static_mut_refs)]
+        USB_IF.write(usb_if);
+
+        hal::interrupt::EXTI7_0.enable();
+    }
 }
 
 pub fn usb_up(dpu: Peri<'static, PC5>) {
