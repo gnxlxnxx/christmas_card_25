@@ -1,3 +1,3 @@
 fn main() {
-    println!("cargo:rustc-link-arg-bins=-Tlink_usb.x");
+    println!("cargo:rustc-link-arg-bins=-Tlink.x");
 }

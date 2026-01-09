@@ -1,7 +1,7 @@
 INCLUDE memory.x
 /* Provides weak aliases (cf. PROVIDED) for device specific interrupt handlers */
 /* This will usually be provided by a device crate generated using svd2rust (see `device.x`) */
-INCLUDE device_usb.x
+INCLUDE device.x
 
 PROVIDE(_stext = ORIGIN(REGION_TEXT));
 PROVIDE(_stack_start = ORIGIN(REGION_STACK) + LENGTH(REGION_STACK));
