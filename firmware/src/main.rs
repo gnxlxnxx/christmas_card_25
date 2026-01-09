@@ -10,6 +10,7 @@ mod vectors;
 mod builtins;
 
 use ch32_hal::interrupt::InterruptExt;
+use qingke_rt::interrupt;
 use ch32_hal::{self as hal};
 use embassy_futures::block_on;
 use panic_halt as _;
@@ -68,8 +69,6 @@ fn main() -> ! {
         }
     })
 }
-
-use ch32_hal::interrupt;
 
 #[interrupt]
 #[allow(static_mut_refs)]

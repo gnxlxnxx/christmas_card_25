@@ -5,7 +5,7 @@ mod time;
 
 use core::{mem::MaybeUninit, primitive::u16};
 
-use crate::{drivers::timer::matrix::Matrix, hal::interrupt};
+use crate::drivers::timer::matrix::Matrix;
 use ch32_hal::{
     self as hal, Peri,
     interrupt::InterruptExt,
@@ -19,6 +19,7 @@ use ch32_hal::{
         Channel, low_level::{CountingMode, OutputCompareMode, Timer}
     },
 };
+use qingke_rt::interrupt;
 
 const CYCLES: u16 = 4800;
 
