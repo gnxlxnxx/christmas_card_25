@@ -5,8 +5,8 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 
 use crate::util::sync::Signal;
 
-const HIST_LOW: u16 = 80;
-const HIST_HIGH: u16 = 96;
+const HIST_LOW: u16 = 45;
+const HIST_HIGH: u16 = 50;
 const FILT_LEN: u8 = 16;
 
 static BTN_STATE: Group<AtomicBool> = Group([
