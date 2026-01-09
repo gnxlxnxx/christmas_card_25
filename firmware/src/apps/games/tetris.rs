@@ -182,8 +182,11 @@ impl<'a> Tetris<'a> {
             Button::R => {
                 p.x += 1;
             }
-            _ => {
+            Button::Select => {
                 p.rotate(true);
+            }
+            Button::Start => {
+                p.rotate(false);
             }
         }
 
