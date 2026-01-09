@@ -81,9 +81,6 @@ pub struct Ws2812 {
     _private: (),
 }
 
-// I have 2 leading and one trailing led full of '0's
-static mut SPI_DMA_TRANSFER_BUFFER: [[u16; 6]; LEDS + 3] = [[0u16; 6]; LEDS + 3];
-
 impl Ws2812 {
     pub fn new(
         _pin: Peri<'static, peripherals::PC6>,
@@ -121,28 +118,25 @@ impl Ws2812 {
 
     #[allow(static_mut_refs)]
     pub async fn write(&mut self, colors: &[Color; LEDS]) {
+        // I have 2 leading and one trailing led full of '0's
+        let mut spi_dma_buf = [[0u16; 6]; LEDS + 3];
 
-        unsafe {
-            for (signal, color) in SPI_DMA_TRANSFER_BUFFER[2..LEDS + 2].iter_mut().zip(colors) {
-                color.gen_grb_data(signal);
-            }
+        for (signal, color) in spi_dma_buf[2..LEDS + 2].iter_mut().zip(colors) {
+            color.gen_grb_data(signal);
         }
 
-        unsafe {hal::interrupt::DMA1_CHANNEL3.enable()};
         let tx_dst = pac::SPI1.datar().as_ptr();
         let ch = pac::DMA1.ch(3-1);
         ch.par().write_value(tx_dst as u32); // PADDR
-        unsafe {
-        ch.mar().write_value(SPI_DMA_TRANSFER_BUFFER.as_flattened() as *const _ as *const u16 as u32); // MADDR
-        ch.ndtr().write(|w| w.set_ndt(SPI_DMA_TRANSFER_BUFFER.as_flattened().len() as u16)); // CNTR
-        }
+        ch.mar().write_value(spi_dma_buf.as_flattened() as *const _ as *const u16 as u32); // MADDR
+        ch.ndtr().write(|w| w.set_ndt(spi_dma_buf.as_flattened().len() as u16)); // CNTR
         ch.cr().write(|w| {
             w.set_psize(pac::dma::vals::Size::BITS16);
             w.set_msize(pac::dma::vals::Size::BITS16);
             w.set_minc(true); // Increase memory address
             w.set_dir(pac::dma::vals::Dir::FROMMEMORY);
             w.set_teie(false); // no interrupt on errror
-            w.set_tcie(false); // interrupt on tx complete
+            w.set_tcie(true);  // interrupt on tx complete
             w.set_htie(false); // no interrupt half
             w.set_circ(false); // circular
             //w.set_pl(options.priority.into()); // priority
@@ -150,6 +144,10 @@ impl Ws2812 {
         });
 
         // Wait for the SPI to be done
-        poll_while(|| pac::SPI1.statr().read().bsy()).await;
+        poll_while(||
+            !hal::interrupt::DMA1_CHANNEL3.is_pending()
+            || pac::SPI1.statr().read().bsy()
+        ).await;
+        hal::interrupt::DMA1_CHANNEL3.unpend();
     }
 }
