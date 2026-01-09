@@ -78,7 +78,7 @@ impl Color {
 }
 
 pub struct Ws2812 {
-    //spi: Spi<'a, peripherals::SPI1, ch32_hal::mode::Async>,
+    _private: (),
 }
 
 // I have 2 leading and one trailing led full of '0's
@@ -116,7 +116,7 @@ impl Ws2812 {
             w.set_dff(true); // send/receive u16
         });
 
-        Self { }
+        Self { _private: () }
     }
 
     #[allow(static_mut_refs)]

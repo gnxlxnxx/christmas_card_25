@@ -32,12 +32,7 @@ static mut USB_IF: MaybeUninit<UsbIf<0x4001_1000usize, 3, 2, 3>> = MaybeUninit::
 fn main() -> ! {
     let p = hal::init(hal::Config {
         rcc: hal::rcc::Config::SYSCLK_FREQ_48MHZ_HSI,
-        dma_interrupt_priority: qingke::interrupt::Priority::P0,
     });
-
-    // It's enabled by the hal
-    // We don't want an interrupt before we're ready
-    hal::interrupt::EXTI7_0.disable();
 
     let usb = usb::init(p.PC3, p.PC2, &mut hal::pac::AFIO, &mut hal::pac::EXTI, &mut hal::pac::SYSTICK);
     #[allow(static_mut_refs)]
@@ -54,11 +49,8 @@ fn main() -> ! {
 
     unsafe { hal::interrupt::EXTI7_0.enable() };
 
-    // WS2812 uses some DMA interrupts internally
-    // Make the EXTI interrupt preempt all others, otherwise it gets called to slow and usb doesn't work
-    hal::interrupt::DMA1_CHANNEL3.set_priority(hal::interrupt::Priority::P15);
     hal::interrupt::EXTI7_0.set_priority(hal::interrupt::Priority::P0);
-    hal::interrupt::TIM1_UP.set_priority(hal::interrupt::Priority::P14);
+    hal::interrupt::TIM1_UP.set_priority(hal::interrupt::Priority::P1);
     usb::usb_up(p.PC5);
 
     block_on(async {
