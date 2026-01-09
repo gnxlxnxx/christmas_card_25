@@ -1,9 +1,7 @@
 use ch32_hal as hal;
-use hal::spi::{Config, Spi};
 use hal::{Peri, peripherals};
 use hal::pac;
-use crate::util::sync::{Event, poll_while};
-use hal::interrupt;
+use crate::util::sync::poll_while;
 use hal::interrupt::InterruptExt;
 
 pub const LEDS: usize = 6;

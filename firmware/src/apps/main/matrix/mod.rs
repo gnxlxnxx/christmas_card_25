@@ -1,7 +1,6 @@
 use embassy_futures::select::select;
-use embassy_sync::{blocking_mutex::raw::RawMutex};
 
-use crate::util::sync::{Event, Signal};
+use crate::util::sync::Event;
 
 mod message;
 mod rand_pulse;

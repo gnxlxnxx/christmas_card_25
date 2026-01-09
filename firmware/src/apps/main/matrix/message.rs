@@ -1,4 +1,4 @@
-use embassy_time::{Duration, Ticker};
+use embassy_time::Ticker;
 
 use crate::util::text::{self, TEXT_BRIGHTNESS, TEXT_DURATION};
 

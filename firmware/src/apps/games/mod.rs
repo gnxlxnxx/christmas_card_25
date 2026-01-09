@@ -90,7 +90,7 @@ impl Game {
     }
 }
 
-pub async fn run(ws2812: &mut Ws2812) {
+pub async fn run(_ws2812: &mut Ws2812) {
     let mut game = Game::new();
 
     loop {

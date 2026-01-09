@@ -16,7 +16,7 @@ use ch32_hal::{
     },
     peripherals,
     timer::{
-        Channel, low_level::{CountingMode, OutputCompareMode, Timer}
+        Channel, low_level::Timer
     },
 };
 use qingke_rt::interrupt;

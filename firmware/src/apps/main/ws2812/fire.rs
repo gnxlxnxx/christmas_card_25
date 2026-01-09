@@ -25,7 +25,7 @@ pub async fn run(filt_ws2812: &mut FilteredWs2812<'_>) -> ! {
 
                 for (led, phase) in filt_ws2812.target_mut().iter_mut().zip(phases) {
                     let index: usize = (phase >> 8) as usize;
-                    let rs: u8 = if (index >= 128) {
+                    let rs: u8 = if index >= 128  {
                         255 - SINTABLE[index - 128]
                     } else {
                         SINTABLE[index]

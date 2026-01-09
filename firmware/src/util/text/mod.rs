@@ -1,6 +1,6 @@
 mod font;
 
-use core::{iter, sync::atomic::Ordering};
+use core::sync::atomic::Ordering;
 
 use embassy_time::{Duration, Ticker};
 

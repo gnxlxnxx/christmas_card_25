@@ -1,7 +1,7 @@
 use core::sync::atomic::{AtomicBool, Ordering};
 
-use ch32_hal::{Peri, pac, peripherals};
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
+use ch32_hal::{pac, peripherals, Peri};
+use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 
 use crate::util::sync::Signal;
 
@@ -20,10 +20,10 @@ static BTN_EVENT_SIGNAL: Signal<CriticalSectionRawMutex, Event> = Signal::new();
 
 #[derive(Debug)]
 pub struct Pins<'a> {
-    start: Peri<'a, peripherals::PD7>,
-    select: Peri<'a, peripherals::PD4>,
-    l: Peri<'a, peripherals::PC0>,
-    r: Peri<'a, peripherals::PD3>,
+    _start: Peri<'a, peripherals::PD7>,
+    _select: Peri<'a, peripherals::PD4>,
+    _l: Peri<'a, peripherals::PC0>,
+    _r: Peri<'a, peripherals::PD3>,
 }
 
 impl<'a> Pins<'a> {
@@ -33,7 +33,12 @@ impl<'a> Pins<'a> {
         l: Peri<'a, peripherals::PC0>,
         r: Peri<'a, peripherals::PD3>,
     ) -> Self {
-        Self { start, select, l, r }
+        Self {
+            _start: start,
+            _select: select,
+            _l: l,
+            _r: r,
+        }
     }
 
     pub(super) fn set_high_all(&mut self) {
@@ -96,7 +101,7 @@ impl<T> Group<T> {
         &self.0[btn as usize]
     }
 
-    pub fn set(&mut self, btn: Button, val: T) {
+    pub fn _set(&mut self, btn: Button, val: T) {
         self.0[btn as usize] = val;
     }
 

@@ -1,9 +1,8 @@
-use core::mem;
 
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
-use crate::{drivers::{buttons::{Button, Buttons, Event}, flash, matrix::{self, Framebuffer, Matrix}}, util::{self, itoa::utoa10, rand::WhiteNoiseGenerator, text::{self, TEXT_BRIGHTNESS, TEXT_DURATION}}};
+use crate::{drivers::{buttons::{Button, Buttons, Event}, flash, matrix::{self, Framebuffer, Matrix}}, util::rand::WhiteNoiseGenerator};
 
 const HEAD_BRIGHTNESS: u8 = 64;
 const SNAKE_BRIGHTNESS: u8 = 32;

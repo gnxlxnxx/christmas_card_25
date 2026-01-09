@@ -1,9 +1,8 @@
 use embassy_futures::select::select;
-use embassy_sync::{blocking_mutex::raw::RawMutex};
 
 use crate::{
     drivers::ws2812::{self, Color, Ws2812},
-    util::{sync::{Event, Signal}, ws2812::FilteredWs2812},
+    util::{sync::Event, ws2812::FilteredWs2812},
 };
 
 pub mod fire;

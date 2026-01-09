@@ -1,11 +1,10 @@
 use embassy_futures::select::{Either, select, select3};
-use embassy_sync::{blocking_mutex::raw::NoopRawMutex};
 use embassy_time::{Duration, Ticker};
 
 use crate::{drivers::{
     buttons::{Button, Buttons, Event},
     ws2812::Ws2812,
-}, util::sync::{self, Signal}};
+}, util::sync::{self}};
 
 pub mod matrix;
 pub mod ws2812;
