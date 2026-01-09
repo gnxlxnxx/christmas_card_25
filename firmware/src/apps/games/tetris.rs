@@ -71,7 +71,7 @@ impl Piece {
 }
 
 struct Tetris<'a> {
-    board: [[u8; Framebuffer::WIDTH]; Framebuffer::HEIGHT],
+    board: [[bool; Framebuffer::WIDTH]; Framebuffer::HEIGHT],
     current: Piece,
     rng: WhiteNoiseGenerator,
     fb: &'a Framebuffer,
@@ -91,7 +91,7 @@ const PIECES: [u8; 7] = [
 impl<'a> Tetris<'a> {
     pub fn new() -> Self {
         let mut t = Self {
-            board: [[0; Framebuffer::WIDTH]; Framebuffer::HEIGHT],
+            board: [[false; Framebuffer::WIDTH]; Framebuffer::HEIGHT],
             current: Piece {
                 shape: 0,
                 x: 0,
@@ -127,7 +127,7 @@ impl<'a> Tetris<'a> {
             if py >= HEIGHT || px >= WIDTH {
                 return true;
             }
-            if self.board[py as usize][px as usize] != 0 {
+            if self.board[py as usize][px as usize] {
                 return true;
             }
         }
@@ -145,12 +145,12 @@ impl<'a> Tetris<'a> {
             let x = p.x + (i % 4) as u8;
             let y = p.y + (i >> 2) as u8;
             if x < WIDTH && y < HEIGHT {
-                self.board[y as usize][x as usize] = 1;
+                self.board[y as usize][x as usize] = true;
             }
         }
 
         self.clear_lines();
-        let lost = self.board[1].iter().any(|&c| c != 0);
+        let lost = self.board[1].iter().any(|&c| c);
         if lost {
             Some(GameResult { score: self.score })
         } else {
@@ -161,12 +161,12 @@ impl<'a> Tetris<'a> {
 
     fn clear_lines(&mut self) {
         for y in 0..Framebuffer::HEIGHT {
-            let full = self.board[y].iter().all(|&c| c != 0);
+            let full = self.board[y].iter().all(|&c| c);
             if full {
                 for y_up in (1..=y).rev() {
                     self.board[y_up] = self.board[y_up - 1];
                 }
-                self.board[0] = [0; Framebuffer::WIDTH];
+                self.board[0] = [false; Framebuffer::WIDTH];
                 self.score += 1;
             }
         }
@@ -211,7 +211,7 @@ impl<'a> Tetris<'a> {
 
         for y in 0..HEIGHT {
             for x in 0..WIDTH {
-                if self.board[y as usize][x as usize] != 0 {
+                if self.board[y as usize][x as usize] {
                     self.fb.store(x as usize, y as usize, 50);
                 }
             }
