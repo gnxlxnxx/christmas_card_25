@@ -7,6 +7,7 @@ const HIGH_SCORE_TEXT: &[u8] = b" High Score: ";
 
 pub mod snake;
 pub mod tetris;
+pub mod pong;
 
 async fn show_score(has_won: bool, score: u32, high_score: u32) {
     let mut clock = Ticker::every(TEXT_DURATION);
@@ -54,6 +55,7 @@ async fn wait_for_start_or_select() {
 enum Game {
     Tetris,
     Snake,
+    Pong,
 }
 
 impl Game {
@@ -64,7 +66,8 @@ impl Game {
     pub fn next(&mut self) {
         *self = match self {
             Self::Tetris => Self::Snake,
-            Self::Snake => Self::Tetris,
+            Self::Snake => Self::Pong,
+            Self::Pong => Self::Tetris,
         }
     }
 
@@ -72,6 +75,7 @@ impl Game {
         match self {
             Self::Tetris => b"Tetris",
             Self::Snake => b"Snake",
+            Self::Pong => b"Pong",
         }
     }
 
@@ -79,6 +83,7 @@ impl Game {
         match self {
             Self::Tetris => 0,
             Self::Snake => 1,
+            _ => panic!("No high score for this game"),
         }
     }
 
@@ -86,6 +91,7 @@ impl Game {
         match self {
             Self::Tetris => tetris::run().await,
             Self::Snake => snake::run().await,
+            Self::Pong => pong::run().await,
         }
     }
 }
