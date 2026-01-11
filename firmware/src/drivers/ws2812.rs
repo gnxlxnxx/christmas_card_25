@@ -29,7 +29,6 @@ const BITQUARTETS: [u16; 16] = [
 
 // I have 2 leading and one trailing led full of '0's
 static mut SPI_DMA_BUF: [[u16; 6]; LEDS + 3] = [[0u16; 6]; LEDS + 3];
-static TRANSFER_STARTED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Color([u8; 3]);
@@ -117,20 +116,17 @@ impl Ws2812 {
             w.set_dff(true); // send/receive u16
         });
 
+        hal::interrupt::DMA1_CHANNEL3.pend();
+
         Self { _private: () }
     }
 
     pub async fn write(&mut self, colors: &[Color; LEDS]) {
-        if TRANSFER_STARTED.load(Ordering::Relaxed) {
-            // Wait for previous SPI to be done
-            poll_while(|| {
-                !hal::interrupt::DMA1_CHANNEL3.is_pending() || pac::SPI1.statr().read().bsy()
-            })
-            .await;
-            hal::interrupt::DMA1_CHANNEL3.unpend();
-        } else {
-            TRANSFER_STARTED.store(true, Ordering::Relaxed);
-        }
+        // Wait for previous SPI to be done
+        poll_while(|| {
+            !hal::interrupt::DMA1_CHANNEL3.is_pending() || pac::SPI1.statr().read().bsy()
+        }).await;
+        hal::interrupt::DMA1_CHANNEL3.unpend();
 
         #[allow(static_mut_refs)]
         let spi_dma_buf = unsafe { &mut SPI_DMA_BUF };
