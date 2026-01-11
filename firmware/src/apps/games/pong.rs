@@ -1,17 +1,20 @@
 use core::sync::atomic::Ordering;
 
 use embassy_futures::select::{Either, select};
-use embassy_time::{Duration, Ticker, Timer};
+use embassy_time::{Duration, Instant, Timer};
 
 use crate::drivers::{
     buttons::{Button, Buttons, Event},
-    matrix::{Framebuffer, Matrix},
+    matrix::{self, Framebuffer, Matrix},
 };
 
 const SCORE_BRIGHTNESS: u8 = 16;
 const END_SCORE_BRIGHTNESS: u8 = 32;
 const PADDLE_BRIGHTNESS: u8 = 32;
 const BALL_BRIGHTNESS: u8 = 96;
+
+const RESET_PAUSE_DURATION: Duration = Duration::from_millis(1500);
+const INITIAL_DURATION: Duration = Duration::from_millis(200);
 
 struct Ball {
     pub x: i8,
@@ -58,17 +61,17 @@ impl<const TOP: bool> Player<TOP> {
     const PADDLE_OVERSHOOT: i8 = 1;
     const PADDLE_X_MIN: i8 = -Self::PADDLE_OVERSHOOT;
     const PADDLE_X_MAX: i8 = Framebuffer::WIDTH as i8 - Self::PADDLE_LEN + Self::PADDLE_OVERSHOOT;
-    const PADDLE_X_START: i8 = (Framebuffer::WIDTH as i8 - Self::PADDLE_LEN) / 2;
+    const PADDLE_X_INITIAL: i8 = (Framebuffer::WIDTH as i8 - Self::PADDLE_LEN) / 2;
     const PADDLE_Y: i8 = if TOP { 0 } else { Framebuffer::HEIGHT as i8 - 1 };
 
     pub const fn new() -> Self {
         Self {
             misses: 0,
-            paddle_x: Self::PADDLE_X_START,
+            paddle_x: Self::PADDLE_X_INITIAL,
         }
     }
 
-    pub fn collide_ball(&mut self, ball: &mut Ball) -> bool {
+    pub fn collide_ball(&mut self, ball: &mut Ball) -> CollideResult {
         if ball.y == Self::PADDLE_Y {
             let delta = ball.x - self.paddle_x;
 
@@ -81,15 +84,17 @@ impl<const TOP: bool> Player<TOP> {
                     0
                 };
                 ball.y_dir = -ball.y_dir;
+
+                CollideResult::Hit
             } else {
                 *ball = Ball::with_y_dir(if TOP { 1 } else { -1 });
                 self.misses += 1;
 
-                return true;
+                CollideResult::Missed
             }
+        } else {
+            CollideResult::None
         }
-
-        false
     }
 
     pub fn move_paddle(&mut self, val: i8) {
@@ -97,7 +102,7 @@ impl<const TOP: bool> Player<TOP> {
     }
 
     pub fn reset_paddle(&mut self) {
-        self.paddle_x = Self::PADDLE_X_START;
+        self.paddle_x = Self::PADDLE_X_INITIAL;
     }
 
     pub fn draw_paddle(&self, fb: &Framebuffer) {
@@ -123,10 +128,21 @@ impl<const TOP: bool> Player<TOP> {
     }
 }
 
-enum AdvanceResult {
-    Finished,
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum CollideResult {
     Missed,
+    Hit,
     None,
+}
+
+impl CollideResult {
+    pub fn or(self, f: impl FnOnce() -> Self) -> Self {
+        if self == Self::None {
+            f()
+        } else {
+            self
+        }
+    }
 }
 
 struct Game {
@@ -146,21 +162,21 @@ impl Game {
         }
     }
 
-    pub fn advance(&mut self) -> AdvanceResult {
-        if self.top.collide_ball(&mut self.ball) || self.bottom.collide_ball(&mut self.ball) {
+    pub fn advance(&mut self) -> CollideResult {
+        let res = self.top.collide_ball(&mut self.ball).or(|| self.bottom.collide_ball(&mut self.ball));
+
+        if res == CollideResult::Missed {
             self.top.reset_paddle();
             self.bottom.reset_paddle();
-
-            if self.top.misses == Self::SCORE_MAX || self.bottom.misses == Self::SCORE_MAX {
-                AdvanceResult::Finished
-            } else {
-                AdvanceResult::Missed
-            }
         } else {
             self.ball.advance();
-
-            AdvanceResult::None
         }
+
+        res
+    }
+
+    pub fn has_ended(&self) -> bool {
+        self.top.misses == Self::SCORE_MAX || self.bottom.misses == Self::SCORE_MAX
     }
 
     pub fn draw_score(&self, fb: &Framebuffer, brightness: u8) {
@@ -179,12 +195,13 @@ impl Game {
 
 pub async fn run() {
     let mut g = Game::new();
-    let mut clock = Ticker::every(Duration::from_millis(250));
+    let mut next_tick = Instant::now() + RESET_PAUSE_DURATION;
+    let mut ticks = INITIAL_DURATION.as_ticks() as u32;
 
     loop {
         g.draw(Matrix::fb());
 
-        match select(Buttons::event(), clock.next()).await {
+        match select(Buttons::event(), Timer::at(next_tick)).await {
             Either::First(Event { pressed: true, button }) => match button {
                 Button::Start => g.top.move_paddle(-1),
                 Button::Select => g.top.move_paddle(1),
@@ -192,10 +209,21 @@ pub async fn run() {
                 Button::R => g.bottom.move_paddle(1),
             }
             Either::First(Event { pressed: false, button: _ }) => (),
-            Either::Second(()) => match g.advance() {
-                AdvanceResult::Finished => break,
-                AdvanceResult::Missed => clock.reset_after(Duration::from_millis(1500)),
-                AdvanceResult::None => (),
+            Either::Second(()) => next_tick += match g.advance() {
+                CollideResult::Missed => if g.has_ended() {
+                    break
+                } else {
+                    ticks = INITIAL_DURATION.as_ticks() as u32;
+
+                    RESET_PAUSE_DURATION
+                }
+                CollideResult::Hit => {
+                    ticks = (((ticks << 5) - ticks) >> 5)
+                        .max(matrix::FRAME_DURATION.as_ticks() as u32);
+
+                    Duration::from_ticks(ticks as u64)
+                }
+                CollideResult::None => Duration::from_ticks(ticks as u64),
             }
         }
     }
