@@ -60,6 +60,14 @@ impl Game {
         }
     }
 
+    pub fn prev(&mut self) {
+        *self = match self {
+            Self::Snake => Self::Tetris,
+            Self::Pong => Self::Snake,
+            Self::Tetris => Self::Pong,
+        }
+    }
+
     pub const fn to_str(&self) -> &'static [u8] {
         match self {
             Self::Tetris => b"Tetris",
@@ -97,6 +105,7 @@ pub async fn run(ws2812: &mut Ws2812) {
         ).await {
             Either::First(Event { pressed: true, button }) => match button {
                 Button::Start => break,
+                Button::L => game.prev(),
                 _ => game.next(),
             }
             Either::First(Event { pressed: false, button }) => (),
