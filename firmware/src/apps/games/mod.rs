@@ -35,21 +35,10 @@ async fn show_score(has_won: bool, score: u32, high_score: u32) {
 }
 
 async fn wait_for_start_or_select() {
-    loop {
-        match Buttons::event().await {
-            Event {
-                button: Button::Start,
-                pressed: true,
-            } |
-            Event {
-                button: Button::Select,
-                pressed: true,
-            } => {
-                break
-            },
-            _ => (),
-        }
-    }
+    while !matches!(
+        Buttons::event().await,
+        Event { button: Button::Start | Button::Select, pressed: true }
+    ) {}
 }
 
 enum Game {

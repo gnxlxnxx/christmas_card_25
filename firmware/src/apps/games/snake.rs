@@ -171,7 +171,7 @@ struct Game<'a> {
 
 impl<'a> Game<'a> {
     pub fn new(fb: &'a Framebuffer) -> Self {
-        let mut g = Game {
+        let mut g = Self {
             rng: WhiteNoiseGenerator::new(),
             field: Field::new(fb),
             dir: Direction::Right,
@@ -269,18 +269,12 @@ pub async fn run() {
 
     let res = loop {
         match select(Buttons::event(), clock.next()).await {
-            Either::First(ev) => match  ev {
-                Event {
-                    button: Button::Start,
-                    pressed: true,
-                } => {
+            Either::First(Event { pressed: true, button }) => match button {
+                Button::Start => {
                     clock.reset();
                     paused ^= true;
                 }
-                Event {
-                    button: Button::Select,
-                    pressed: true,
-                } => {
+                Button::Select => {
                     if paused {
                         break GameResult { has_won: false, score: g.score };
                     } else {
@@ -293,16 +287,10 @@ pub async fn run() {
                         }
                     }
                 }
-                Event {
-                    button: Button::L,
-                    pressed: true,
-                } => if !paused { g.turn_ccw() },
-                Event {
-                    button: Button::R,
-                    pressed: true,
-                } => if !paused { g.turn_cw() },
-                _ => (),
+                Button::L => if !paused { g.turn_ccw(); },
+                Button::R => if !paused { g.turn_cw(); },
             }
+            Either::First(Event { pressed: false, button: _ }) => (),
             Either::Second(()) => {
                 if !paused && let Some(r) = g.advance() {
                     break r;

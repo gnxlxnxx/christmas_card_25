@@ -15,6 +15,8 @@ pub async fn run() -> ! {
         match select(update_clock.next(), clear_clock.next()).await {
             Either::First(()) => {
                 if !clear_bottom {
+                    clear_clock.reset();
+
                     clear_bottom = true;
 
                     for (t, b) in fb.0[fb.0.len() - 2].iter().zip(fb.0.last().unwrap()) {
@@ -24,10 +26,6 @@ pub async fn run() -> ! {
                         if new == 0 {
                             clear_bottom = false;
                         }
-                    }
-
-                    if clear_bottom {
-                        clear_clock.reset();
                     }
                 }
 

@@ -23,34 +23,22 @@ pub async fn run(ws2812: &mut Ws2812) {
 
             loop {
                 match select(Buttons::event(), clock.next()).await {
-                    Either::First(ev) => match ev {
-                        Event {
-                            button: Button::Start,
-                            pressed: true,
-                        } => break,
-                        Event {
-                            button: Button::Select,
-                            pressed: true,
-                        } => {
+                    Either::First(Event { pressed: true, button }) => match button {
+                        Button::Start => break,
+                        Button::Select => {
                             clock.reset();
                             auto = true;
                         }
-                        Event {
-                            button: Button::L,
-                            pressed: true,
-                        } => {
-                            auto = false;
+                        Button::L => {
                             ws2812_next_event.trigger();
-                        }
-                        Event {
-                            button: Button::R,
-                            pressed: true,
-                        } => {
                             auto = false;
-                            matrix_next_event.trigger();
                         }
-                        _ => (),
-                    },
+                        Button::R => {
+                            matrix_next_event.trigger();
+                            auto = false;
+                        }
+                    }
+                    Either::First(Event { pressed: false, button: _ }) => (),
                     Either::Second(()) => {
                         if auto {
                             ws2812_next_event.trigger();
