@@ -1,3 +1,5 @@
+use core::sync::atomic::{AtomicBool, Ordering, compiler_fence};
+
 use crate::util::sync::poll_while;
 use ch32_hal as hal;
 use hal::interrupt::InterruptExt;
@@ -24,6 +26,10 @@ const BITQUARTETS: [u16; 16] = [
     0b1110111011101000,
     0b1110111011101110,
 ];
+
+// I have 2 leading and one trailing led full of '0's
+static mut SPI_DMA_BUF: [[u16; 6]; LEDS + 3] = [[0u16; 6]; LEDS + 3];
+static TRANSFER_STARTED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Color([u8; 3]);
@@ -114,10 +120,20 @@ impl Ws2812 {
         Self { _private: () }
     }
 
-    #[allow(static_mut_refs)]
     pub async fn write(&mut self, colors: &[Color; LEDS]) {
-        // I have 2 leading and one trailing led full of '0's
-        let mut spi_dma_buf = [[0u16; 6]; LEDS + 3];
+        if TRANSFER_STARTED.load(Ordering::Relaxed) {
+            // Wait for previous SPI to be done
+            poll_while(|| {
+                !hal::interrupt::DMA1_CHANNEL3.is_pending() || pac::SPI1.statr().read().bsy()
+            })
+            .await;
+            hal::interrupt::DMA1_CHANNEL3.unpend();
+        } else {
+            TRANSFER_STARTED.store(true, Ordering::Relaxed);
+        }
+
+        #[allow(static_mut_refs)]
+        let spi_dma_buf = unsafe { &mut SPI_DMA_BUF };
 
         for (signal, color) in spi_dma_buf[2..LEDS + 2].iter_mut().zip(colors) {
             color.gen_grb_data(signal);
@@ -128,6 +144,7 @@ impl Ws2812 {
         ch.par().write_value(tx_dst as u32); // PADDR
         ch.mar().write_value(spi_dma_buf.as_flattened() as *const _ as *const u16 as u32); // MADDR
         ch.ndtr().write(|w| w.set_ndt(spi_dma_buf.as_flattened().len() as u16)); // CNTR
+        compiler_fence(Ordering::Release);
         ch.cr().write(|w| {
             w.set_psize(pac::dma::vals::Size::BITS16);
             w.set_msize(pac::dma::vals::Size::BITS16);
@@ -140,12 +157,5 @@ impl Ws2812 {
             //w.set_pl(options.priority.into()); // priority
             w.set_en(true); // and start
         });
-
-        // Wait for the SPI to be done
-        poll_while(|| {
-            !hal::interrupt::DMA1_CHANNEL3.is_pending() || pac::SPI1.statr().read().bsy()
-        })
-        .await;
-        hal::interrupt::DMA1_CHANNEL3.unpend();
     }
 }
