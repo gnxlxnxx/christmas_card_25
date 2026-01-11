@@ -19,6 +19,7 @@ use drivers::{
 };
 
 use crate::apps::{games, main};
+use crate::util::ws2812::FilteredWs2812;
 
 
 #[qingke_rt::entry]
@@ -37,14 +38,15 @@ fn main() -> ! {
     drivers::timer_init(led, btn, p.TIM1, p.TIM2);
 
     let mut ws2812 = drivers::ws2812::Ws2812::new(p.PC6, p.SPI1, p.DMA1_CH3);
+    let mut filt_ws2812 = FilteredWs2812::new(&mut ws2812);
 
     drivers::usb::init(p.PC3, p.PC2, p.AFIO, p.SYSTICK);
     drivers::usb::usb_up(p.PC5);
 
     block_on(async {
         loop {
-            main::run(&mut ws2812).await;
-            games::run(&mut ws2812).await;
+            main::run(&mut filt_ws2812).await;
+            games::run(&mut filt_ws2812).await;
         }
     })
 }

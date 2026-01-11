@@ -11,6 +11,5 @@ pub async fn run() -> ! {
     loop {
         text::clear_scroll(&mut clock).await;
         text::scroll(MESSAGE, TEXT_BRIGHTNESS, &mut clock).await;
-        text::clear_scroll(&mut clock).await;
     }
 }

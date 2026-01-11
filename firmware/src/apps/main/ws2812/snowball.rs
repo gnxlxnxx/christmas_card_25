@@ -1,7 +1,6 @@
-use super::HUETABLE;
 use crate::drivers::ws2812::Color;
 use crate::util::rand;
-use crate::util::ws2812::FilteredWs2812;
+use crate::util::ws2812::{FilteredWs2812, HUETABLE};
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 

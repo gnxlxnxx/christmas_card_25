@@ -28,20 +28,12 @@ fn move_left(fb: &Framebuffer) {
     }
 }
 
-pub async fn clear_scroll(clock: &mut Ticker) {
-    let fb = Matrix::fb();
-
-    for _ in 0..Framebuffer::WIDTH - 1 {
-        move_left(fb);
-        clock.next().await;
-    }
+pub fn clear_scroll(clock: &mut Ticker) -> impl Future<Output = ()> {
+    scroll(b"EE", 0, clock)
 }
 
 pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
     let fb = Matrix::fb();
-
-    move_left(fb);
-    clock.next().await;
 
     for &c in text {
         let glyph = Letter::get(c).0;

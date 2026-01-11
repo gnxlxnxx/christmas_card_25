@@ -1,7 +1,7 @@
 use embassy_futures::select::{Either, select};
-use embassy_time::Ticker;
+use embassy_time::{Duration, Ticker};
 
-use crate::{drivers::{buttons::{Button, Buttons, Event}, ws2812::Ws2812}, util::{itoa::utoa10, text::{self, TEXT_BRIGHTNESS, TEXT_DURATION}}};
+use crate::{drivers::{buttons::{Button, Buttons, Event}, ws2812::{Color, Ws2812}}, util::{itoa::utoa10, rand::WhiteNoiseGenerator, text::{self, TEXT_BRIGHTNESS, TEXT_DURATION}, ws2812::{FilteredWs2812, HUETABLE}}};
 
 const HIGH_SCORE_TEXT: &[u8] = b" High Score: ";
 
@@ -39,6 +39,19 @@ async fn wait_for_start_or_select() {
         Buttons::event().await,
         Event { button: Button::Start | Button::Select, pressed: true }
     ) {}
+}
+
+fn set_ws2812_led_random(led: &mut Color, enabled: bool, noisegen: &mut WhiteNoiseGenerator) {
+    if enabled {
+        if *led == Color::new(0, 0, 0) {
+            let ang = noisegen.rand8() as usize;
+            led.set_r(HUETABLE[(ang + 85) % HUETABLE.len()]);
+            led.set_g(HUETABLE[ang % HUETABLE.len()]);
+            led.set_b(HUETABLE[(ang + 170) % HUETABLE.len()]);
+        }
+    } else {
+        *led = Color::new(0, 0, 0);
+    }
 }
 
 enum Game {
@@ -93,25 +106,49 @@ impl Game {
     }
 }
 
-pub async fn run(ws2812: &mut Ws2812) {
-    let mut game = Game::new();
+pub async fn run(filt_ws2812: &mut FilteredWs2812<'_>) {
+    let leds = filt_ws2812.target_mut();
+    leds[1] = Color::new(0, 0, 0);
+    leds[4] = Color::new(0, 0, 0);
 
-    loop {
-        let mut clock = Ticker::every(TEXT_DURATION);
+    select(
+        async {
+            let mut game = Game::new();
 
-        match select(
-            Buttons::event(),
-            text::scroll(game.to_str(), TEXT_BRIGHTNESS, &mut clock)
-        ).await {
-            Either::First(Event { pressed: true, button }) => match button {
-                Button::Start => break,
-                Button::L => game.prev(),
-                _ => game.next(),
+            loop {
+                let mut clock = Ticker::every(TEXT_DURATION);
+
+                match select(
+                    Buttons::event(),
+                    text::scroll(game.to_str(), TEXT_BRIGHTNESS, &mut clock)
+                ).await {
+                    Either::First(Event { pressed: true, button }) => match button {
+                        Button::Start => break,
+                        Button::L => game.prev(),
+                        _ => game.next(),
+                    }
+                    Either::First(Event { pressed: false, button: _ }) => (),
+                    Either::Second(()) => (),
+                }
             }
-            Either::First(Event { pressed: false, button }) => (),
-            Either::Second(()) => (),
-        }
-    }
 
-    game.run().await;
+            game.run().await;
+        },
+        async {
+            let mut clock = Ticker::every(Duration::from_millis(10));
+            let mut noisegen = WhiteNoiseGenerator::new();
+
+            loop {
+                let leds = filt_ws2812.target_mut();
+
+                set_ws2812_led_random(&mut leds[0], Buttons::get(Button::L), &mut noisegen);
+                set_ws2812_led_random(&mut leds[2], Buttons::get(Button::Start), &mut noisegen);
+                set_ws2812_led_random(&mut leds[3], Buttons::get(Button::Select), &mut noisegen);
+                set_ws2812_led_random(&mut leds[5], Buttons::get(Button::R), &mut noisegen);
+
+                filt_ws2812.update().await;
+                clock.next().await;
+            }
+        }
+    ).await;
 }
