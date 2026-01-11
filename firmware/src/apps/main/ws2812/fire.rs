@@ -24,7 +24,11 @@ pub async fn run(filt_ws2812: &mut FilteredWs2812<'_>) -> ! {
 
                 for (led, phase) in filt_ws2812.target_mut().iter_mut().zip(phases) {
                     let index: usize = (phase >> 8) as usize;
-                    let rs: u8 = SINTABLE[index] >> 3;
+                    let rs: u8 = if index >= 128  {
+                        255 - SINTABLE[index - 128]
+                    } else {
+                        SINTABLE[index]
+                    }  >> 3;
 
                     led.set_r((HUETABLE[rs.wrapping_add(30) as usize] as u32 >> 2) as u8);
                     led.set_g((HUETABLE[rs as usize] as u32 >> 3) as u8);

@@ -6,8 +6,8 @@ use core::{
 
 use ch32_hal::{Peri, pac, peripherals};
 
-const HIST_LOW: u16 = 74;
-const HIST_HIGH: u16 = 78;
+const HIST_LOW: u16 = 45;
+const HIST_HIGH: u16 = 50;
 const FILT_LEN: u8 = 16;
 
 static BTN_STATE: Group<AtomicBool> = Group([
@@ -97,7 +97,7 @@ impl<T> Group<T> {
         &self.0[btn as usize]
     }
 
-    pub fn set(&mut self, btn: Button, val: T) {
+    pub fn _set(&mut self, btn: Button, val: T) {
         self.0[btn as usize] = val;
     }
 

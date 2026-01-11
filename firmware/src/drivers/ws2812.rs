@@ -1,4 +1,4 @@
-use core::sync::atomic::{AtomicBool, Ordering, compiler_fence};
+use core::sync::atomic::{Ordering, compiler_fence};
 
 use crate::util::sync::poll_while;
 use ch32_hal as hal;
@@ -127,6 +127,7 @@ impl Ws2812 {
             !hal::interrupt::DMA1_CHANNEL3.is_pending() || pac::SPI1.statr().read().bsy()
         }).await;
         hal::interrupt::DMA1_CHANNEL3.unpend();
+        compiler_fence(Ordering::Acquire);
 
         #[allow(static_mut_refs)]
         let spi_dma_buf = unsafe { &mut SPI_DMA_BUF };

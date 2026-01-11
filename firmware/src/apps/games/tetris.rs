@@ -8,6 +8,10 @@ use embassy_time::{Duration, Ticker};
 const WIDTH: u8 = Framebuffer::WIDTH as u8;
 const HEIGHT: u8 = Framebuffer::HEIGHT as u8;
 
+const _: () = {
+    assert!(WIDTH <= 8)
+};
+
 #[derive(Clone, Copy)]
 struct GameResult {
     pub score: u32,
@@ -28,8 +32,8 @@ impl Piece {
         let mut max_y = 0;
         for i in 0..16 {
             if (self.shape >> i) & 1 == 1 {
-                let x = (i & 3) as u8;
-                let y = (i >> 2) as u8;
+                let x = (i % 4) as u8;
+                let y = (i / 4) as u8;
                 if x < min_x {
                     min_x = x;
                 }
@@ -50,14 +54,14 @@ impl Piece {
     fn rotate(&mut self, cw: bool) {
         let mut out = 0;
         for i in 0..16 {
-            let x = (i & 3) as u8;
-            let y = (i >> 2) as u8;
+            let x = i % 4;
+            let y = i / 4;
 
-            let src = (y << 2) + x; // y*4 + x
+            let src = y * 4 + x;
             let dst = if cw {
-                (x << 2) + (3 - y) // x*4 + (3-y)
+                x * 4 + 3 - y
             } else {
-                ((3 - x) << 2) + y // (3-x)*4 + y
+                (3 - x) * 4 + y
             };
 
             out |= ((self.shape >> src) & 1) << dst;
@@ -67,7 +71,7 @@ impl Piece {
 }
 
 struct Tetris<'a> {
-    board: [[u8; Framebuffer::WIDTH]; Framebuffer::HEIGHT],
+    board: [u8; Framebuffer::HEIGHT],
     current: Piece,
     rng: WhiteNoiseGenerator,
     fb: &'a Framebuffer,
@@ -87,7 +91,7 @@ const PIECES: [u8; 7] = [
 impl<'a> Tetris<'a> {
     pub fn new() -> Self {
         let mut t = Self {
-            board: [[0; Framebuffer::WIDTH]; Framebuffer::HEIGHT],
+            board: [0; Framebuffer::HEIGHT],
             current: Piece {
                 shape: 0,
                 x: 0,
@@ -117,13 +121,13 @@ impl<'a> Tetris<'a> {
                 continue;
             }
 
-            let px = p.x + ((i as u8) & 3); // funny %4
-            let py = p.y + ((i as u8) >> 2); // funny /4
+            let px = p.x + ((i as u8) % 4);
+            let py = p.y + ((i as u8) / 4);
 
             if py >= HEIGHT || px >= WIDTH {
                 return true;
             }
-            if self.board[py as usize][px as usize] != 0 {
+            if self.board[py as usize] & (1 << px) != 0 {
                 return true;
             }
         }
@@ -138,15 +142,15 @@ impl<'a> Tetris<'a> {
                 continue;
             }
 
-            let x = p.x + (i & 3) as u8;
+            let x = p.x + (i % 4) as u8;
             let y = p.y + (i >> 2) as u8;
-            if x < WIDTH && y < HEIGHT {
-                self.board[y as usize][x as usize] = 1;
+            if y < HEIGHT {
+                self.board[y as usize] |= 1 << x;
             }
         }
 
         self.clear_lines();
-        let lost = self.board[1].iter().any(|&c| c != 0);
+        let lost = self.board[1] != 0;
         if lost {
             Some(GameResult { score: self.score })
         } else {
@@ -157,12 +161,12 @@ impl<'a> Tetris<'a> {
 
     fn clear_lines(&mut self) {
         for y in 0..Framebuffer::HEIGHT {
-            let full = self.board[y].iter().all(|&c| c != 0);
+            let full = self.board[y] == ((1 << (WIDTH as u32) ) - 1) as u8;
             if full {
                 for y_up in (1..=y).rev() {
                     self.board[y_up] = self.board[y_up - 1];
                 }
-                self.board[0] = [0; Framebuffer::WIDTH];
+                self.board[0] = 0;
                 self.score += 1;
             }
         }
@@ -207,7 +211,7 @@ impl<'a> Tetris<'a> {
 
         for y in 0..HEIGHT {
             for x in 0..WIDTH {
-                if self.board[y as usize][x as usize] != 0 {
+                if self.board[y as usize] & (1 << x) != 0 {
                     self.fb.store(x as usize, y as usize, 50);
                 }
             }
@@ -218,8 +222,8 @@ impl<'a> Tetris<'a> {
             if (p.shape >> i) & 1 == 0 {
                 continue;
             }
-            let x = p.x + (i & 3) as u8;
-            let y = p.y + (i >> 2) as u8;
+            let x = p.x + (i % 4) as u8;
+            let y = p.y + (i / 4) as u8;
 
             if x < WIDTH && y < HEIGHT {
                 self.fb.store(x as usize, y as usize, 100);

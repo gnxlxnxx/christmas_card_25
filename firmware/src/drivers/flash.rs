@@ -3,8 +3,6 @@ use ch32_hal::pac::{
     flash::regs::{Addr, Keyr, Modekeyr},
 };
 
-use crate::util::sync::poll_while;
-
 #[unsafe(link_section = ".highscore")]
 static mut HIGH_SCORES: [u32; 2] = [0; 2];
 const HIGH_SCORES_PTR: *mut [u32; 2] = (&raw mut HIGH_SCORES).wrapping_byte_add(0x08000000);

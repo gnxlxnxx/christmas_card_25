@@ -321,11 +321,11 @@ pub fn init(
     tim1.regs_advanced().bdtr().write(|w| w.set_moe(true));
 
     // Enable interrupt
-    tim1.regs_basic().dmaintenr().modify(|r| r.set_uie(true));
+    tim1.regs_basic().dmaintenr().write(|r| r.set_uie(true));
 
     // Configure tim2 as slave of tim1 (tim1 enable also controls tim2)
-    tim1.regs_gp16().ctlr2().modify(|w| w.set_mms(Mms::ENABLE));
-    tim2.regs_gp16().smcfgr().modify(|w| w.set_sms(0b101));
+    tim1.regs_gp16().ctlr2().write(|w| w.set_mms(Mms::ENABLE));
+    tim2.regs_gp16().smcfgr().write(|w| w.set_sms(0b101));
 
     tim2.regs_basic().ctlr1().write(|w| {
         w.set_arpe(true);
