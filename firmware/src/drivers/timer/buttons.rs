@@ -1,4 +1,4 @@
-use core::sync::atomic::{AtomicBool, Ordering};
+use core::{future::poll_fn, sync::atomic::{AtomicBool, AtomicU8, Ordering}, task::Poll};
 
 use ch32_hal::{Peri, pac, peripherals};
 use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
@@ -16,7 +16,7 @@ static BTN_STATE: Group<AtomicBool> = Group([
     AtomicBool::new(false),
 ]);
 
-static BTN_EVENT_SIGNAL: Signal<CriticalSectionRawMutex, Event> = Signal::new();
+static BTN_EVENT_SIGNAL: AtomicU8 = AtomicU8::new(0);
 
 #[derive(Debug)]
 pub struct Pins<'a> {
@@ -137,10 +137,12 @@ pub(super) fn process_samples(sample: Sample, fcount: &mut Group<u8>) {
             } else {
                 let next_state = !prev_state;
                 ext_state.store(next_state, Ordering::Relaxed);
-                let _ = BTN_EVENT_SIGNAL.signal(Event {
-                    button: ch.try_into().unwrap(),
-                    pressed: next_state,
-                });
+                BTN_EVENT_SIGNAL.store(
+                    (1 << 7)
+                    | (u8::from(next_state) << 2)
+                    | (ch as u8),
+                    Ordering::Relaxed
+                );
 
                 0
             }
@@ -158,6 +160,18 @@ impl Buttons {
     }
 
     pub fn event() -> impl Future<Output = Event> {
-        BTN_EVENT_SIGNAL.wait()
+        poll_fn(|_| {
+            let val = BTN_EVENT_SIGNAL.load(Ordering::Relaxed);
+            if val != 0 {
+                BTN_EVENT_SIGNAL.store(0, Ordering::Relaxed);
+
+                Poll::Ready(Event {
+                    button: Button::try_from(val as usize & ((1 << 2) - 1)).unwrap(),
+                    pressed: val & (1 << 2) != 0,
+                })
+            } else {
+                Poll::Pending
+            }
+        })
     }
 }
