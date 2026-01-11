@@ -1,13 +1,15 @@
 use core::sync::atomic::Ordering;
 
 use embassy_futures::select::{Either, select};
-use embassy_time::{Duration, Ticker};
+use embassy_time::{Duration, Ticker, Timer};
 
 use crate::drivers::{buttons::{Button, Buttons, Event}, matrix::{Framebuffer, Matrix}};
 
 
+const SCORE_BRIGHTNESS: u8 = 16;
+const END_SCORE_BRIGHTNESS: u8 = 32;
 const PADDLE_BRIGHTNESS: u8 = 32;
-const BALL_BRIGHTNESS: u8 = 64;
+const BALL_BRIGHTNESS: u8 = 96;
 
 struct Ball {
     pub x: i8,
@@ -19,8 +21,8 @@ struct Ball {
 impl Ball {
     pub fn with_y_dir(y_dir: i8) -> Self {
         Self {
-            x: Framebuffer::WIDTH as i8 / 2,
-            y: Framebuffer::HEIGHT as i8 / 2,
+            x: (Framebuffer::WIDTH as i8 - 1) / 2,
+            y: (Framebuffer::HEIGHT as i8 - 1) / 2,
             x_dir: 0,
             y_dir,
         }
@@ -51,13 +53,16 @@ struct Player<const TOP: bool> {
 
 impl<const TOP: bool> Player<TOP> {
     const PADDLE_LEN: i8 = 3;
-    const PADDLE_X_MAX: i8 = Framebuffer::WIDTH as i8 - Self::PADDLE_LEN;
+    const PADDLE_OVERSHOOT: i8 = 1;
+    const PADDLE_X_MIN: i8 = -Self::PADDLE_OVERSHOOT;
+    const PADDLE_X_MAX: i8 = Framebuffer::WIDTH as i8 - Self::PADDLE_LEN + Self::PADDLE_OVERSHOOT;
+    const PADDLE_X_START: i8 = (Framebuffer::WIDTH as i8 - Self::PADDLE_LEN) / 2;
     const PADDLE_Y: i8 = if TOP { 0 } else { Framebuffer::HEIGHT as i8 - 1 };
 
     pub fn new() -> Self {
         Self {
             misses: 0,
-            paddle_x: Self::PADDLE_X_MAX / 2,
+            paddle_x: Self::PADDLE_X_START,
         }
     }
 
@@ -74,8 +79,6 @@ impl<const TOP: bool> Player<TOP> {
                     0
                 };
                 ball.y_dir = -ball.y_dir;
-
-                ball.advance();
             } else {
                 *ball = Ball::with_y_dir(if TOP { 1 } else { -1 });
                 self.misses += 1;
@@ -88,27 +91,40 @@ impl<const TOP: bool> Player<TOP> {
     }
 
     pub fn move_paddle(&mut self, val: i8) {
-        self.paddle_x = (self.paddle_x + val).max(0).min(Self::PADDLE_X_MAX);
+        self.paddle_x = (self.paddle_x + val).max(Self::PADDLE_X_MIN).min(Self::PADDLE_X_MAX);
     }
 
     pub fn reset_paddle(&mut self) {
-        self.paddle_x = Self::PADDLE_X_MAX / 2;
+        self.paddle_x = Self::PADDLE_X_START;
     }
 
     pub fn draw_paddle(&self, fb: &Framebuffer) {
         let row = &fb.0[Self::PADDLE_Y as usize];
 
-        for field in row.iter().skip(self.paddle_x as usize).take(Self::PADDLE_LEN as usize) {
-            field.store(PADDLE_BRIGHTNESS, Ordering::Relaxed);
+        for x in self.paddle_x..(self.paddle_x + Self::PADDLE_LEN) {
+            if let Ok(x) = usize::try_from(x) {
+                if let Some(field) = row.get(x) {
+                    field.store(PADDLE_BRIGHTNESS, Ordering::Relaxed);
+                }
+            }
+        }
+    }
+
+    pub fn draw_score(&self, fb: &Framebuffer, brightness: u8) {
+        let row = &fb.0[if TOP {
+            (Framebuffer::HEIGHT + 1) / 2
+        } else {
+            (Framebuffer::HEIGHT - 2) / 2
+        }];
+
+        for field in row.iter().take(self.misses as usize) {
+            field.store(brightness, Ordering::Relaxed);
         }
     }
 }
 
 enum AdvanceResult {
-    Finished {
-        top_score: u8,
-        bottom_score: u8,
-    },
+    Finished,
     Missed,
     None,
 }
@@ -120,7 +136,7 @@ struct Game {
 }
 
 impl Game {
-    const SCORE_MAX: u8 = 10;
+    const SCORE_MAX: u8 = Framebuffer::WIDTH as u8;
 
     pub fn new() -> Self {
         let g = Self {
@@ -133,27 +149,30 @@ impl Game {
     }
 
     pub fn advance(&mut self) -> AdvanceResult {
-        self.ball.advance();
-
         if self.top.collide_ball(&mut self.ball) || self.bottom.collide_ball(&mut self.ball) {
-            if self.top.misses == Self::SCORE_MAX || self.bottom.misses == Self::SCORE_MAX {
-                AdvanceResult::Finished {
-                    top_score: self.bottom.misses,
-                    bottom_score: self.top.misses,
-                }
-            } else {
-                self.top.reset_paddle();
-                self.bottom.reset_paddle();
+            self.top.reset_paddle();
+            self.bottom.reset_paddle();
 
+            if self.top.misses == Self::SCORE_MAX || self.bottom.misses == Self::SCORE_MAX {
+                AdvanceResult::Finished
+            } else {
                 AdvanceResult::Missed
             }
         } else {
+            self.ball.advance();
+
             AdvanceResult::None
         }
     }
 
-    pub fn draw(&self, fb: &Framebuffer) {
+    pub fn draw_score(&self, fb: &Framebuffer, brightness: u8) {
         fb.clear_all();
+        self.top.draw_score(fb, brightness);
+        self.bottom.draw_score(fb, brightness);
+    }
+
+    pub fn draw(&self, fb: &Framebuffer) {
+        self.draw_score(fb, SCORE_BRIGHTNESS);
         self.top.draw_paddle(fb);
         self.bottom.draw_paddle(fb);
         self.ball.draw(fb);
@@ -164,9 +183,9 @@ pub async fn run() {
     let mut g = Game::new();
     let mut clock = Ticker::every(Duration::from_millis(250));
 
-    g.draw(Matrix::fb());
-
     loop {
+        g.draw(Matrix::fb());
+
         match select(Buttons::event(), clock.next()).await {
             Either::First(Event { pressed: true, button }) => match button {
                 Button::Start => g.top.move_paddle(-1),
@@ -177,13 +196,15 @@ pub async fn run() {
             Either::First(Event { pressed: false, button: _ }) => (),
             Either::Second(()) => {
                 match g.advance() {
-                    AdvanceResult::Finished { top_score, bottom_score } => break,
+                    AdvanceResult::Finished => break,
                     AdvanceResult::Missed => clock.reset_after(Duration::from_millis(1500)),
                     AdvanceResult::None => (),
                 }
             }
         }
-
-        g.draw(Matrix::fb());
     }
+
+    g.draw_score(Matrix::fb(), END_SCORE_BRIGHTNESS);
+
+    Timer::after_secs(5).await;
 }
