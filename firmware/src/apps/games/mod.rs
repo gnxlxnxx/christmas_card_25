@@ -97,9 +97,9 @@ impl Game {
 
     pub const fn to_str(&self) -> &'static [u8] {
         match self {
-            Self::Tetris => b"Tetris",
-            Self::Snake => b"Snake",
-            Self::Pong => b"Pong",
+            Self::Tetris => b" Tetris",
+            Self::Snake => b" Snake",
+            Self::Pong => b" Pong",
         }
     }
 
@@ -132,17 +132,16 @@ pub async fn run(filt_ws2812: &mut FilteredWs2812<'_>) {
             loop {
                 let mut clock = Ticker::every(TEXT_DURATION);
 
-                match select(
+                if let Either::First(Event { pressed: true, button }) = select(
                     Buttons::event(),
                     text::scroll(game.to_str(), TEXT_BRIGHTNESS, &mut clock)
                 ).await {
-                    Either::First(Event { pressed: true, button }) => match button {
+                    match button {
                         Button::Start => break,
+                        Button::Select => return,
                         Button::L => game.prev(),
-                        _ => game.next(),
+                        Button::R => game.next(),
                     }
-                    Either::First(Event { pressed: false, button: _ }) => (),
-                    Either::Second(()) => (),
                 }
             }
 

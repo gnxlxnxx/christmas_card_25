@@ -800,12 +800,10 @@ impl Letter {
     }
 
     pub const fn downshift(col: u8) -> Option<usize> {
-        if col < Self::END_MARKER {
-            Some(0)
-        } else if col > Self::END_MARKER {
-            Some(2)
-        } else {
+        if col == Self::END_MARKER {
             None
+        } else {
+            Some(2 * (col >> 7) as usize)
         }
     }
 }

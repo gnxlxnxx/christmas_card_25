@@ -36,6 +36,9 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
     let fb = Matrix::fb();
 
     for &c in text {
+        clock.next().await;
+        move_left(fb);
+
         let glyph = Letter::get(c).0;
 
         let mut i = 0;
@@ -47,6 +50,7 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
                 None => break,
             };
 
+            clock.next().await;
             move_left(fb);
 
             for r in downshift..fb.0.len() {
@@ -55,11 +59,7 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
                 col >>= 1;
             }
 
-            clock.next().await;
             i += 1;
         }
-
-        move_left(fb);
-        clock.next().await;
     }
 }
