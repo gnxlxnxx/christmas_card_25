@@ -248,7 +248,7 @@ pub async fn run() {
         game.draw();
     };
 
-    let hs = flash::new_high_score(super::Game::Tetris.high_score_index(), res.score).await;
+    let hs = flash::new_high_score(super::Game::Tetris.high_score_index(), res.score);
 
     super::show_score(false, res.score, hs).await;
 }
