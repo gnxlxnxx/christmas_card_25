@@ -1,10 +1,8 @@
+use crate::util::sync::poll_while;
 use ch32_hal as hal;
-use hal::spi::{Config, Spi};
-use hal::{Peri, peripherals};
-use hal::pac;
-use crate::util::sync::{Event, poll_while};
-use hal::interrupt;
 use hal::interrupt::InterruptExt;
+use hal::pac;
+use hal::{Peri, peripherals};
 
 pub const LEDS: usize = 6;
 
@@ -93,12 +91,12 @@ impl Ws2812 {
             w.set_cnf(6, pac::gpio::vals::Cnf::PULL_IN__AF_PUSH_PULL_OUT);
         });
 
-
         pac::RCC.ahbpcenr().modify(|w| w.set_dma1en(true));
         pac::RCC.apb2pcenr().modify(|w| w.set_spi1en(true));
 
-        pac::SPI1.ctlr2().write(|w| {w.set_ssoe(false);
-                                 w.set_txdmaen(true);
+        pac::SPI1.ctlr2().write(|w| {
+            w.set_ssoe(false);
+            w.set_txdmaen(true);
         });
         pac::SPI1.ctlr1().write(|w| {
             w.set_mstr(true); // master
@@ -126,7 +124,7 @@ impl Ws2812 {
         }
 
         let tx_dst = pac::SPI1.datar().as_ptr();
-        let ch = pac::DMA1.ch(3-1);
+        let ch = pac::DMA1.ch(3 - 1);
         ch.par().write_value(tx_dst as u32); // PADDR
         ch.mar().write_value(spi_dma_buf.as_flattened() as *const _ as *const u16 as u32); // MADDR
         ch.ndtr().write(|w| w.set_ndt(spi_dma_buf.as_flattened().len() as u16)); // CNTR
@@ -136,7 +134,7 @@ impl Ws2812 {
             w.set_minc(true); // Increase memory address
             w.set_dir(pac::dma::vals::Dir::FROMMEMORY);
             w.set_teie(false); // no interrupt on errror
-            w.set_tcie(true);  // interrupt on tx complete
+            w.set_tcie(true); // interrupt on tx complete
             w.set_htie(false); // no interrupt half
             w.set_circ(false); // circular
             //w.set_pl(options.priority.into()); // priority
@@ -144,10 +142,10 @@ impl Ws2812 {
         });
 
         // Wait for the SPI to be done
-        poll_while(||
-            !hal::interrupt::DMA1_CHANNEL3.is_pending()
-            || pac::SPI1.statr().read().bsy()
-        ).await;
+        poll_while(|| {
+            !hal::interrupt::DMA1_CHANNEL3.is_pending() || pac::SPI1.statr().read().bsy()
+        })
+        .await;
         hal::interrupt::DMA1_CHANNEL3.unpend();
     }
 }

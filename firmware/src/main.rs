@@ -3,10 +3,10 @@
 #![feature(type_alias_impl_trait)]
 
 pub mod apps;
+mod builtins;
 pub mod drivers;
 pub mod util;
 mod vectors;
-mod builtins;
 
 use ch32_hal::interrupt::InterruptExt;
 use ch32_hal::{self as hal};
@@ -21,7 +21,6 @@ use drivers::{
 use crate::apps::{games, main};
 use crate::util::ws2812::FilteredWs2812;
 
-
 #[qingke_rt::entry]
 fn main() -> ! {
     let p = hal::init(hal::Config {
@@ -32,7 +31,7 @@ fn main() -> ! {
     hal::interrupt::TIM1_UP.set_priority(hal::interrupt::Priority::P8);
 
     let led = matrix::Pins::new(
-        p.PD0, p.PA2, p.PA1, p.PD6, p.PD5, p.PD2, p.PC7, p.PC4, p.PC1
+        p.PD0, p.PA2, p.PA1, p.PD6, p.PD5, p.PD2, p.PC7, p.PC4, p.PC1,
     );
     let btn = buttons::Pins::new(p.PD7, p.PD4, p.PC0, p.PD3);
     drivers::timer_init(led, btn, p.TIM1, p.TIM2);

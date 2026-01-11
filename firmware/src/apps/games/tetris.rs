@@ -1,11 +1,7 @@
 use crate::drivers::buttons::{Button, Buttons, Event};
 use crate::drivers::flash;
 use crate::matrix::{Framebuffer, Matrix};
-use crate::util::{
-    itoa::utoa10,
-    rand::WhiteNoiseGenerator,
-    text::{self, TEXT_BRIGHTNESS, TEXT_DURATION},
-};
+use crate::util::rand::WhiteNoiseGenerator;
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
@@ -245,13 +241,8 @@ pub async fn run() {
                     break res;
                 }
             }
-            Either::Second(ev) => match ev {
-                Event {
-                    button: b,
-                    pressed: true,
-                } => game.input(b),
-                _ => {}
-            },
+            Either::Second(Event { pressed: true, button}) => game.input(button),
+            Either::Second(Event { pressed: false, button: _ }) => (),
         }
 
         game.draw();

@@ -1,4 +1,9 @@
-use core::{cell::Cell, future::poll_fn, sync::atomic::{AtomicBool, Ordering}, task::Poll};
+use core::{
+    cell::Cell,
+    future::poll_fn,
+    sync::atomic::{AtomicBool, Ordering},
+    task::Poll,
+};
 
 use embassy_sync::blocking_mutex::{Mutex, raw::RawMutex};
 
@@ -18,12 +23,14 @@ impl Event {
     }
 
     pub fn wait(&self) -> impl Future<Output = ()> + Send + Sync {
-        poll_fn(|_| if self.is_triggered() {
-            self.0.store(false, Ordering::Relaxed);
+        poll_fn(|_| {
+            if self.is_triggered() {
+                self.0.store(false, Ordering::Relaxed);
 
-            Poll::Ready(())
-        } else {
-            Poll::Pending
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
         })
     }
 }

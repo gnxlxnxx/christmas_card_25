@@ -1,10 +1,12 @@
-use core::{hint::{assert_unchecked, unreachable_unchecked}, sync::atomic::Ordering};
+use core::sync::atomic::Ordering;
 
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker, Timer};
 
-use crate::drivers::{buttons::{Button, Buttons, Event}, matrix::{Framebuffer, Matrix}};
-
+use crate::drivers::{
+    buttons::{Button, Buttons, Event},
+    matrix::{Framebuffer, Matrix},
+};
 
 const SCORE_BRIGHTNESS: u8 = 16;
 const END_SCORE_BRIGHTNESS: u8 = 32;
@@ -70,7 +72,7 @@ impl<const TOP: bool> Player<TOP> {
         if ball.y == Self::PADDLE_Y {
             let delta = ball.x - self.paddle_x;
 
-            if 0 <= delta && delta <= Self::PADDLE_LEN - 1 {
+            if (0..=Self::PADDLE_LEN - 1).contains(&delta) {
                 ball.x_dir = if delta == 0 {
                     -1
                 } else if delta == Self::PADDLE_LEN - 1 {
@@ -91,7 +93,7 @@ impl<const TOP: bool> Player<TOP> {
     }
 
     pub fn move_paddle(&mut self, val: i8) {
-        self.paddle_x = (self.paddle_x + val).max(Self::PADDLE_X_MIN).min(Self::PADDLE_X_MAX);
+        self.paddle_x = (self.paddle_x + val).clamp(Self::PADDLE_X_MIN, Self::PADDLE_X_MAX);
     }
 
     pub fn reset_paddle(&mut self) {
@@ -102,17 +104,15 @@ impl<const TOP: bool> Player<TOP> {
         let row = &fb.0[Self::PADDLE_Y as usize];
 
         for x in self.paddle_x..(self.paddle_x + Self::PADDLE_LEN) {
-            if let Ok(x) = usize::try_from(x) {
-                if let Some(field) = row.get(x) {
-                    field.store(PADDLE_BRIGHTNESS, Ordering::Relaxed);
-                }
+            if let Ok(x) = usize::try_from(x) && let Some(field) = row.get(x) {
+                field.store(PADDLE_BRIGHTNESS, Ordering::Relaxed);
             }
         }
     }
 
     pub fn draw_score(&self, fb: &Framebuffer, brightness: u8) {
         let row = &fb.0[if TOP {
-            (Framebuffer::HEIGHT + 1) / 2
+            Framebuffer::HEIGHT.div_ceil(2)
         } else {
             (Framebuffer::HEIGHT - 2) / 2
         }];
@@ -192,12 +192,10 @@ pub async fn run() {
                 Button::R => g.bottom.move_paddle(1),
             }
             Either::First(Event { pressed: false, button: _ }) => (),
-            Either::Second(()) => {
-                match g.advance() {
-                    AdvanceResult::Finished => break,
-                    AdvanceResult::Missed => clock.reset_after(Duration::from_millis(1500)),
-                    AdvanceResult::None => (),
-                }
+            Either::Second(()) => match g.advance() {
+                AdvanceResult::Finished => break,
+                AdvanceResult::Missed => clock.reset_after(Duration::from_millis(1500)),
+                AdvanceResult::None => (),
             }
         }
     }

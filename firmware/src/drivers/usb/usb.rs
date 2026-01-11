@@ -853,7 +853,7 @@ impl<const USB_BASE: usize, const DP: u8, const DM: u8, const EPS: usize>
                 e.max_len - offset
             };
             let sendnow = tsend.wrapping_add(offset as usize);
-            if tosend <= 0 {
+            if tosend == 0 {
                 self.usb_send_empty(sendtok);
             } else {
                 unsafe { self.usb_send_data(sendnow, tosend, 0, sendtok) };
@@ -881,7 +881,7 @@ impl<const USB_BASE: usize, const DP: u8, const DM: u8, const EPS: usize>
             }
             return;
         }
-        e.toggle_out = e.toggle_out ^ 0b1;
+        e.toggle_out ^= 0b1;
 
         if epno != 0 || ((self.setup_request == 0) && length > 3) {
             if self.reboot_armed > 0 {

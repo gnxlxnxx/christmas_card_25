@@ -1,6 +1,6 @@
 mod font;
 
-use core::{iter, sync::atomic::Ordering};
+use core::sync::atomic::Ordering;
 
 use embassy_time::{Duration, Ticker};
 
@@ -54,7 +54,6 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
                 fb.0[r].last().unwrap().store(val, Ordering::Relaxed);
                 col >>= 1;
             }
-
 
             clock.next().await;
             i += 1;

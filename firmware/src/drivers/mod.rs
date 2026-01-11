@@ -1,5 +1,5 @@
-mod timer;
 pub mod flash;
+mod timer;
 pub mod usb;
 pub mod ws2812;
 

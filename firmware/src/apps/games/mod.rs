@@ -1,13 +1,24 @@
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
-use crate::{drivers::{buttons::{Button, Buttons, Event}, ws2812::{Color, Ws2812}}, util::{itoa::utoa10, rand::WhiteNoiseGenerator, text::{self, TEXT_BRIGHTNESS, TEXT_DURATION}, ws2812::{FilteredWs2812, HUETABLE}}};
+use crate::{
+    drivers::{
+        buttons::{Button, Buttons, Event},
+        ws2812::Color,
+    },
+    util::{
+        itoa::utoa10,
+        rand::WhiteNoiseGenerator,
+        text::{self, TEXT_BRIGHTNESS, TEXT_DURATION},
+        ws2812::{FilteredWs2812, HUETABLE},
+    },
+};
 
 const HIGH_SCORE_TEXT: &[u8] = b" High Score: ";
 
+pub mod pong;
 pub mod snake;
 pub mod tetris;
-pub mod pong;
 
 async fn show_score(has_won: bool, score: u32, high_score: u32) {
     let mut clock = Ticker::every(TEXT_DURATION);
@@ -37,7 +48,10 @@ async fn show_score(has_won: bool, score: u32, high_score: u32) {
 async fn wait_for_start_or_select() {
     while !matches!(
         Buttons::event().await,
-        Event { button: Button::Start | Button::Select, pressed: true }
+        Event {
+            button: Button::Start | Button::Select,
+            pressed: true
+        }
     ) {}
 }
 
@@ -149,6 +163,6 @@ pub async fn run(filt_ws2812: &mut FilteredWs2812<'_>) {
                 filt_ws2812.update().await;
                 clock.next().await;
             }
-        }
+        },
     ).await;
 }

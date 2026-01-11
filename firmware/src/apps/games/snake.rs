@@ -1,9 +1,14 @@
-use core::mem;
-
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
-use crate::{drivers::{buttons::{Button, Buttons, Event}, flash, matrix::{self, Framebuffer, Matrix}}, util::{self, itoa::utoa10, rand::WhiteNoiseGenerator, text::{self, TEXT_BRIGHTNESS, TEXT_DURATION}}};
+use crate::{
+    drivers::{
+        buttons::{Button, Buttons, Event},
+        flash,
+        matrix::{self, Framebuffer, Matrix},
+    },
+    util::rand::WhiteNoiseGenerator,
+};
 
 const HEAD_BRIGHTNESS: u8 = 64;
 const SNAKE_BRIGHTNESS: u8 = 32;
@@ -199,12 +204,10 @@ impl<'a> Game<'a> {
     pub fn advance(&mut self) -> Option<GameResult> {
         if self.retreat_tail() {
             Some(GameResult { has_won: true, score: self.score })
+        } else if self.advance_head() {
+            Some(GameResult { has_won: false, score: self.score })
         } else {
-            if self.advance_head() {
-                Some(GameResult { has_won: false, score: self.score })
-            } else {
-                None
-            }
+            None
         }
     }
 
@@ -264,7 +267,7 @@ pub async fn run() {
     let fb = Matrix::fb();
     let mut clock_ticks = Duration::from_millis(250).as_ticks();
     let mut clock = Ticker::every(Duration::from_ticks(clock_ticks));
-    let mut g = Game::new(&fb);
+    let mut g = Game::new(fb);
     let mut paused = false;
 
     let res = loop {
@@ -287,9 +290,17 @@ pub async fn run() {
                         }
                     }
                 }
-                Button::L => if !paused { g.turn_ccw(); },
-                Button::R => if !paused { g.turn_cw(); },
-            }
+                Button::L => {
+                    if !paused {
+                        g.turn_ccw();
+                    }
+                }
+                Button::R => {
+                    if !paused {
+                        g.turn_cw();
+                    }
+                }
+            },
             Either::First(Event { pressed: false, button: _ }) => (),
             Either::Second(()) => {
                 if !paused && let Some(r) = g.advance() {

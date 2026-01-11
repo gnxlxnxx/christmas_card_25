@@ -2,7 +2,7 @@ pub mod descriptors;
 pub mod usb;
 use crate::drivers::buttons::{Button, Buttons};
 use crate::hal;
-use crate::hal::{gpio::Pin, pac, peripherals::*, Peri};
+use crate::hal::{Peri, gpio::Pin, pac, peripherals::*};
 
 use ch32_hal::interrupt::InterruptExt;
 use qingke_rt::interrupt;
@@ -16,7 +16,9 @@ static mut USB_IF: MaybeUninit<UsbIf<0x4001_1000usize, 3, 2, 3>> = MaybeUninit::
 fn EXTI7_0_IRQHandler() {
     // IMPORTANT: Keep latency low here
     #[allow(static_mut_refs)]
-    unsafe { USB_IF.assume_init_mut().usb_interrupt_handler() };
+    unsafe {
+        USB_IF.assume_init_mut().usb_interrupt_handler()
+    };
 }
 
 pub fn init(

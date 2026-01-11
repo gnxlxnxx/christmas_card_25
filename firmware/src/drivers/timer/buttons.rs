@@ -1,9 +1,10 @@
-use core::{future::poll_fn, sync::atomic::{AtomicBool, AtomicU8, Ordering}, task::Poll};
+use core::{
+    future::poll_fn,
+    sync::atomic::{AtomicBool, AtomicU8, Ordering},
+    task::Poll,
+};
 
 use ch32_hal::{Peri, pac, peripherals};
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
-
-use crate::util::sync::Signal;
 
 const HIST_LOW: u16 = 80;
 const HIST_HIGH: u16 = 96;
@@ -20,10 +21,10 @@ static BTN_EVENT_SIGNAL: AtomicU8 = AtomicU8::new(0);
 
 #[derive(Debug)]
 pub struct Pins<'a> {
-    start: Peri<'a, peripherals::PD7>,
-    select: Peri<'a, peripherals::PD4>,
-    l: Peri<'a, peripherals::PC0>,
-    r: Peri<'a, peripherals::PD3>,
+    _start: Peri<'a, peripherals::PD7>,
+    _select: Peri<'a, peripherals::PD4>,
+    _l: Peri<'a, peripherals::PC0>,
+    _r: Peri<'a, peripherals::PD3>,
 }
 
 impl<'a> Pins<'a> {
@@ -33,7 +34,7 @@ impl<'a> Pins<'a> {
         l: Peri<'a, peripherals::PC0>,
         r: Peri<'a, peripherals::PD3>,
     ) -> Self {
-        Self { start, select, l, r }
+        Self { _start: start, _select: select, _l: l, _r: r }
     }
 
     pub(super) fn set_high_all(&mut self) {
@@ -138,10 +139,8 @@ pub(super) fn process_samples(sample: Sample, fcount: &mut Group<u8>) {
                 let next_state = !prev_state;
                 ext_state.store(next_state, Ordering::Relaxed);
                 BTN_EVENT_SIGNAL.store(
-                    (1 << 7)
-                    | (u8::from(next_state) << 2)
-                    | (ch as u8),
-                    Ordering::Relaxed
+                    (1 << 7) | (u8::from(next_state) << 2) | (ch as u8),
+                    Ordering::Relaxed,
                 );
 
                 0

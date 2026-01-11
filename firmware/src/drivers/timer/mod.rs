@@ -15,9 +15,7 @@ use ch32_hal::{
         timer::vals::{CcmrInputCcs, CcmrOutputCcs, Cms, Dir, FilterValue, Mms, Ocm, Urs},
     },
     peripherals,
-    timer::{
-        Channel, low_level::{CountingMode, OutputCompareMode, Timer}
-    },
+    timer::{Channel, low_level::Timer},
 };
 use qingke_rt::interrupt;
 

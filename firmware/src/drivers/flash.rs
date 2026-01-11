@@ -1,4 +1,7 @@
-use ch32_hal::pac::{FLASH, flash::regs::{Addr, Keyr, Modekeyr}};
+use ch32_hal::pac::{
+    FLASH,
+    flash::regs::{Addr, Keyr, Modekeyr},
+};
 
 use crate::util::sync::poll_while;
 
@@ -49,7 +52,6 @@ pub async fn new_high_score(id: usize, score: u32) -> u32 {
                 w.set_bufload(true);
             });
             while FLASH.statr().read().bsy() {}
-
         }
         FLASH.ctlr().write(|w| {
             w.set_page_pg(true);

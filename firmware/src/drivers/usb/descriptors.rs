@@ -136,7 +136,7 @@ pub fn get_descriptor_info(w_value: u32) -> (*const u8, u16) {
             )
         },
         0x04090302 => unsafe {
-            if KeyboardReport::desc().len() != KBD_DESC_LEN as usize {
+            if KeyboardReport::desc().len() != KBD_DESC_LEN {
                 core::slice::from_raw_parts(
                     &STR_ERR as *const _ as *const u8,
                     STR_ERR.b_length as usize,

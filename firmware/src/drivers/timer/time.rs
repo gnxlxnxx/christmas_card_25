@@ -1,4 +1,4 @@
-use core::cell::{Cell};
+use core::cell::Cell;
 
 use critical_section::Mutex;
 use embassy_time_driver::{Driver, time_driver_impl};
