@@ -1,4 +1,4 @@
-use core::sync::atomic::Ordering;
+use core::{hint::{assert_unchecked, unreachable_unchecked}, sync::atomic::Ordering};
 
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker, Timer};
@@ -19,7 +19,7 @@ struct Ball {
 }
 
 impl Ball {
-    pub fn with_y_dir(y_dir: i8) -> Self {
+    pub const fn with_y_dir(y_dir: i8) -> Self {
         Self {
             x: (Framebuffer::WIDTH as i8 - 1) / 2,
             y: (Framebuffer::HEIGHT as i8 - 1) / 2,
@@ -28,7 +28,7 @@ impl Ball {
         }
     }
 
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self::with_y_dir(1)
     }
 
@@ -59,7 +59,7 @@ impl<const TOP: bool> Player<TOP> {
     const PADDLE_X_START: i8 = (Framebuffer::WIDTH as i8 - Self::PADDLE_LEN) / 2;
     const PADDLE_Y: i8 = if TOP { 0 } else { Framebuffer::HEIGHT as i8 - 1 };
 
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             misses: 0,
             paddle_x: Self::PADDLE_X_START,
@@ -138,14 +138,12 @@ struct Game {
 impl Game {
     const SCORE_MAX: u8 = Framebuffer::WIDTH as u8;
 
-    pub fn new() -> Self {
-        let g = Self {
+    pub const fn new() -> Self {
+        Self {
             ball: Ball::new(),
             top: Player::new(),
             bottom: Player::new(),
-        };
-
-        g
+        }
     }
 
     pub fn advance(&mut self) -> AdvanceResult {

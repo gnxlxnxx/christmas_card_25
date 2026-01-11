@@ -93,22 +93,13 @@ pub async fn run(ws2812: &mut Ws2812) {
 
         match select(
             Buttons::event(),
-            async {
-                text::clear_scroll(&mut clock).await;
-                text::scroll(game.to_str(), TEXT_BRIGHTNESS, &mut clock).await;
-            }
+            text::scroll(game.to_str(), TEXT_BRIGHTNESS, &mut clock)
         ).await {
-            Either::First(ev) => match ev {
-                Event {
-                    button: Button::Start,
-                    pressed: true,
-                } => break,
-                Event {
-                    button: _,
-                    pressed: true,
-                } => game.next(),
-                _ => (),
+            Either::First(Event { pressed: true, button }) => match button {
+                Button::Start => break,
+                _ => game.next(),
             }
+            Either::First(Event { pressed: false, button }) => (),
             Either::Second(()) => (),
         }
     }
