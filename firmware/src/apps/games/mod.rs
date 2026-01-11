@@ -138,9 +138,9 @@ pub async fn run(filt_ws2812: &mut FilteredWs2812<'_>) {
                 ).await {
                     match button {
                         Button::Start => break,
-                        Button::Select => return,
-                        Button::L => game.prev(),
-                        Button::R => game.next(),
+                        Button::Select => game.next(),
+                        Button::L => return,
+                        Button::R => game.prev(),
                     }
                 }
             }
