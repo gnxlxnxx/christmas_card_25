@@ -105,7 +105,7 @@ impl<'a> Tetris<'a> {
         t
     }
 
-    fn spawn(&mut self) {
+    fn spawn(&mut self) -> bool {
         let i = (self.rng.rand8() % 7) as usize;
         self.current = Piece {
             shape: (PIECES[i] as u16) << 4,
@@ -113,6 +113,8 @@ impl<'a> Tetris<'a> {
             y: 0,
         };
         self.current.y -= self.current.bounds().1.0;
+
+        self.collides(&self.current)
     }
 
     fn collides(&self, p: &Piece) -> bool {
@@ -134,7 +136,7 @@ impl<'a> Tetris<'a> {
         false
     }
 
-    fn lock(&mut self) -> Option<GameResult> {
+    fn lock(&mut self) {
         let p = self.current;
 
         for i in 0..16 {
@@ -147,15 +149,6 @@ impl<'a> Tetris<'a> {
             if y < HEIGHT {
                 self.board[y as usize] |= 1 << x;
             }
-        }
-
-        self.clear_lines();
-        let lost = self.board[1] != 0;
-        if lost {
-            Some(GameResult { score: self.score })
-        } else {
-            self.spawn();
-            None
         }
     }
 
@@ -202,12 +195,19 @@ impl<'a> Tetris<'a> {
     fn tick(&mut self) -> Option<GameResult> {
         let mut p = self.current;
         p.y += 1;
+
         if self.collides(&p) {
-            self.lock()
+            self.lock();
+            self.clear_lines();
+
+            if self.spawn() {
+                return Some(GameResult { score: self.score })
+            }
         } else {
             self.current = p;
-            None
         }
+
+        None
     }
 
     pub fn draw(&mut self) {
