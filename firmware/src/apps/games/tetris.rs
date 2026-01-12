@@ -5,12 +5,25 @@ use crate::util::rand::WhiteNoiseGenerator;
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
+const BOARD_BRIGHTNESS: u8 = 50;
+const PIECE_BRIGHTNESS: u8 = 100;
+
+const PIECES: [u8; 7] = [
+    0b0000_1111, // I
+    0b0110_0110, // O
+    0b1110_0100, // T
+    0b0011_0110, // И
+    0b0110_0011, // Z
+    0b1000_1110, // Г
+    0b0010_1110, // L
+];
+
 const WIDTH: u8 = Framebuffer::WIDTH as u8;
 const HEIGHT: u8 = Framebuffer::HEIGHT as u8;
 
 const _: () = {
-    assert!(Framebuffer::WIDTH <= u8::MAX as usize);
-    assert!(Framebuffer::HEIGHT <= u8::MAX as usize);
+    assert!(Framebuffer::WIDTH <= i8::MAX as usize);
+    assert!(Framebuffer::HEIGHT <= i8::MAX as usize);
     assert!(WIDTH as u32 <= u8::BITS);
 };
 
@@ -27,7 +40,7 @@ struct Piece {
 }
 
 impl Piece {
-    fn bounds(&self) -> ((u8, u8), (u8, u8)) {
+    fn _bounds(&self) -> ((u8, u8), (u8, u8)) {
         let mut min_x = 4;
         let mut max_x = 0;
         let mut min_y = 4;
@@ -80,16 +93,6 @@ struct Tetris<'a> {
     score: u32,
 }
 
-const PIECES: [u8; 7] = [
-    0b1111_0000, // I
-    0b0110_0110, // O
-    0b1110_0100, // T
-    0b0011_0110, // И
-    0b0110_0011, // Z
-    0b1000_1110, // Г
-    0b0010_1110, // L
-];
-
 impl<'a> Tetris<'a> {
     pub fn new() -> Self {
         let mut t = Self {
@@ -112,9 +115,8 @@ impl<'a> Tetris<'a> {
         self.current = Piece {
             shape: (PIECES[i] as u16) << 4,
             x: (WIDTH / 2) - 2,
-            y: 0,
+            y: -1i8 as u8,
         };
-        self.current.y -= self.current.bounds().1.0;
 
         self.collides(&self.current)
     }
@@ -125,8 +127,12 @@ impl<'a> Tetris<'a> {
                 continue;
             }
 
-            let px = p.x + ((i as u8) % 4);
-            let py = p.y + ((i as u8) / 4);
+            let px = p.x.wrapping_add((i as u8) % 4);
+            let py = p.y.wrapping_add((i as u8) / 4);
+
+            if (py as i8) < 0 {
+                continue;
+            }
 
             if py >= HEIGHT || px >= WIDTH {
                 return true;
@@ -146,8 +152,8 @@ impl<'a> Tetris<'a> {
                 continue;
             }
 
-            let x = p.x + (i % 4) as u8;
-            let y = p.y + (i >> 2) as u8;
+            let x = p.x.wrapping_add((i % 4) as u8);
+            let y = p.y.wrapping_add((i / 4) as u8);
             if y < HEIGHT {
                 self.board[y as usize] |= 1 << x;
             }
@@ -157,7 +163,7 @@ impl<'a> Tetris<'a> {
     fn clear_lines(&mut self) {
         let mut cleared = 0;
 
-        for y in 0..Framebuffer::HEIGHT {
+        for y in 0..(HEIGHT as usize) {
             let full = self.board[y] == ((1 << (WIDTH as u32)) - 1) as u8;
             if full {
                 for y_up in (1..=y).rev() {
@@ -176,10 +182,10 @@ impl<'a> Tetris<'a> {
 
         match but {
             Button::L => {
-                p.x -= 1;
+                p.x = p.x.wrapping_sub(1);
             }
             Button::R => {
-                p.x += 1;
+                p.x = p.x.wrapping_add(1);
             }
             Button::Select => {
                 p.rotate(true);
@@ -196,7 +202,7 @@ impl<'a> Tetris<'a> {
 
     fn tick(&mut self) -> Option<GameResult> {
         let mut p = self.current;
-        p.y += 1;
+        p.y = p.y.wrapping_add(1);
 
         if self.collides(&p) {
             self.lock();
@@ -218,7 +224,7 @@ impl<'a> Tetris<'a> {
         for y in 0..HEIGHT {
             for x in 0..WIDTH {
                 if self.board[y as usize] & (1 << x) != 0 {
-                    self.fb.store(x as usize, y as usize, 50);
+                    self.fb.store(x as usize, y as usize, BOARD_BRIGHTNESS);
                 }
             }
         }
@@ -228,11 +234,11 @@ impl<'a> Tetris<'a> {
             if (p.shape >> i) & 1 == 0 {
                 continue;
             }
-            let x = p.x + (i % 4) as u8;
-            let y = p.y + (i / 4) as u8;
+            let x = p.x.wrapping_add((i % 4) as u8);
+            let y = p.y.wrapping_add((i / 4) as u8);
 
             if x < WIDTH && y < HEIGHT {
-                self.fb.store(x as usize, y as usize, 100);
+                self.fb.store(x as usize, y as usize, PIECE_BRIGHTNESS);
             }
         }
     }

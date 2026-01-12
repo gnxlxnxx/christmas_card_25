@@ -20,7 +20,7 @@ pub async fn run() -> ! {
         match select(gen_clock.next(), update_clock.next()).await {
             Either::First(()) => {
                 let row = noisegen.rand8() as usize % Framebuffer::HEIGHT;
-                let col = noisegen.rand8() as usize % 8;
+                let col = noisegen.rand8() as usize % Framebuffer::WIDTH;
                 target_buf[row] |= 1 << col;
             }
             Either::Second(()) => {
