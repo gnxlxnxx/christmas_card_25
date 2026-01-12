@@ -310,7 +310,7 @@ pub async fn run() {
         }
     };
 
-    let hs = flash::new_high_score(super::Game::Snake.high_score_index(), res.score);
+    let hs = flash::new_high_score(super::Game::Snake.high_score_index(), res.score).await;
 
     super::show_score(res.has_won, res.score, hs).await;
 }
