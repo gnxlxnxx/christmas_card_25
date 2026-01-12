@@ -20,6 +20,8 @@ pub async fn new_high_score(id: usize, score: u32) -> u32 {
         scores[id] = 0;
     }
 
+    let hs = scores[id];
+
     if score > scores[id] {
         scores[id] = score;
 
@@ -75,5 +77,5 @@ pub async fn new_high_score(id: usize, score: u32) -> u32 {
         });
     }
 
-    scores[id]
+    hs
 }
