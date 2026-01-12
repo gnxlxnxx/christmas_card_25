@@ -6,8 +6,8 @@ use core::{
 
 use ch32_hal::{Peri, pac, peripherals};
 
-const HIST_LOW: u16 = 45;
-const HIST_HIGH: u16 = 50;
+const HIST_LOW: u16 = 65;
+const HIST_HIGH: u16 = 70;
 const FILT_LEN: u8 = 16;
 
 static BTN_STATE: Group<AtomicBool> = Group([
