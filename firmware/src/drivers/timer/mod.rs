@@ -21,6 +21,8 @@ use qingke_rt::interrupt;
 
 const CYCLES: u16 = 4800;
 
+const _: () = assert!(CYCLES >= matrix::PWM_MAX);
+
 static mut TIMER_DRIVER: MaybeUninit<TimerDriver> = MaybeUninit::uninit();
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy)]

@@ -16,6 +16,11 @@ const BALL_BRIGHTNESS: u8 = 96;
 const RESET_PAUSE_DURATION: Duration = Duration::from_millis(1500);
 const INITIAL_DURATION: Duration = Duration::from_millis(200);
 
+const _: () = {
+    assert!(Framebuffer::WIDTH <= i8::MAX as usize);
+    assert!(Framebuffer::HEIGHT <= i8::MAX as usize);
+};
+
 struct Ball {
     pub x: i8,
     pub y: i8,
@@ -196,6 +201,7 @@ impl Game {
 pub async fn run() {
     let mut g = Game::new();
     let mut next_tick = Instant::now() + RESET_PAUSE_DURATION;
+    const { assert!(INITIAL_DURATION.as_ticks() <= u32::MAX as u64); }
     let mut ticks = INITIAL_DURATION.as_ticks() as u32;
 
     loop {
@@ -218,6 +224,7 @@ pub async fn run() {
                     RESET_PAUSE_DURATION
                 }
                 CollideResult::Hit => {
+                    const { assert!(matrix::FRAME_DURATION.as_ticks() <= u32::MAX as u64); }
                     ticks = (((ticks << 5) - ticks) >> 5)
                         .max(matrix::FRAME_DURATION.as_ticks() as u32);
 

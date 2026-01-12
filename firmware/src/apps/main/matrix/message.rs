@@ -3,7 +3,6 @@ use embassy_time::Ticker;
 use crate::util::text::{self, TEXT_BRIGHTNESS, TEXT_DURATION};
 
 const MESSAGE: &[u8] = b"Die Fachschaft Elektro- und Informationstechnik an der \x7f Universit\x80t Stuttgart w\x82nscht Euch allen recht herzlich ein frohes Weihnachtsfest!";
-// const MESSAGE: &[u8] = b"Xmas";
 
 pub async fn run() -> ! {
     let mut clock = Ticker::every(TEXT_DURATION);

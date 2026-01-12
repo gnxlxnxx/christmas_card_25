@@ -60,6 +60,7 @@ const GAMMA_LUT: [[u8; 3]; 128] = [
 pub const FRAME_DURATION: Duration = Duration::from_ticks(2 * Framebuffer::HEIGHT as u64);
 
 pub(super) const ROWS: usize = 9;
+pub(super) const PWM_MAX: u16 = (GAMMA_LUT[127][1] as u16) << 4 | (GAMMA_LUT[127][2] as u16) >> 4;
 const DEBUG_BRIGHTNESS: u8 = 32;
 
 static FB: Framebuffer = Framebuffer::new();

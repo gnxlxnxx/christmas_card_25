@@ -1,8 +1,10 @@
-use crate::drivers::ws2812::Color;
+use crate::drivers::ws2812::{Color, LEDS};
 use crate::util::rand;
 use crate::util::ws2812::{FilteredWs2812, HUETABLE};
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
+
+const _: () = assert!(LEDS == 6);
 
 pub async fn run(filt_ws2812: &mut FilteredWs2812<'_>) -> ! {
     let mut progress_clock = Ticker::every(Duration::from_millis(1500));

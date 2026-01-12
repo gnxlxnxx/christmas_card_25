@@ -12,6 +12,8 @@ use crate::{
 pub const TEXT_DURATION: Duration = Duration::from_millis(75);
 pub const TEXT_BRIGHTNESS: u8 = 64;
 
+const _: () = assert!(Framebuffer::HEIGHT >= 9);
+
 fn move_left(fb: &Framebuffer) {
     for row in fb.0.iter() {
         let len = row.len();

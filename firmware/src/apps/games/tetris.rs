@@ -9,7 +9,9 @@ const WIDTH: u8 = Framebuffer::WIDTH as u8;
 const HEIGHT: u8 = Framebuffer::HEIGHT as u8;
 
 const _: () = {
-    assert!(WIDTH <= 8)
+    assert!(Framebuffer::WIDTH <= u8::MAX as usize);
+    assert!(Framebuffer::HEIGHT <= u8::MAX as usize);
+    assert!(WIDTH as u32 <= u8::BITS);
 };
 
 #[derive(Clone, Copy)]
