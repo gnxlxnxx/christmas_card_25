@@ -14,6 +14,11 @@ const HEAD_BRIGHTNESS: u8 = 64;
 const SNAKE_BRIGHTNESS: u8 = 32;
 const MAULTASCH_BRIGHTNESS: u8 = 96;
 
+const MULTIPLIER_MIN_LENGTH: u8 = 2 * (Framebuffer::WIDTH + Framebuffer::HEIGHT) as u8;
+const INITIAL_DURATION: Duration = Duration::from_millis(250);
+
+const _: () = assert!(Framebuffer::WIDTH * Framebuffer::HEIGHT <= u8::MAX as usize);
+
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum Direction {
     Up,
@@ -245,27 +250,26 @@ impl<'a> Game<'a> {
         self.head = self.head.go_dir(self.dir);
 
         match self.field.get(self.head) {
-            FieldState::Empty => {
-                self.field.set(self.head, FieldState::SnakeHead);
-
-                false
-            }
+            FieldState::Empty => (),
+            FieldState::Snake(_) | FieldState::SnakeHead => return true,
             FieldState::Maultasch => {
-                self.score += if self.length as usize > Framebuffer::HEIGHT { self.multiplier } else { 1 };
+                self.score += if self.length > MULTIPLIER_MIN_LENGTH { self.multiplier } else { 1 };
+
                 self.length_increase += 2;
                 self.field.gen_maultasch(&mut self.rng);
-                self.field.set(self.head, FieldState::SnakeHead);
-
-                false
             }
-            FieldState::Snake(_) | FieldState::SnakeHead => true,
         }
+
+        self.field.set(self.head, FieldState::SnakeHead);
+
+        false
     }
 }
 
 pub async fn run() {
     let fb = Matrix::fb();
-    let mut clock_ticks = Duration::from_millis(250).as_ticks() as u32;
+    const { assert!(INITIAL_DURATION.as_ticks() <= u32::MAX as u64); }
+    let mut clock_ticks = INITIAL_DURATION.as_ticks() as u32;
     let mut clock = Ticker::every(Duration::from_ticks(clock_ticks as u64));
     let mut g = Game::new(fb);
     let mut paused = false;
@@ -282,8 +286,9 @@ pub async fn run() {
                         break GameResult { has_won: false, score: g.score };
                     } else {
                         let new_ticks = clock_ticks / 2;
+                        const { assert!(matrix::FRAME_DURATION.as_ticks() <= u32::MAX as u64); }
                         if new_ticks >= matrix::FRAME_DURATION.as_ticks() as u32 {
-                            g.multiplier += 1;
+                            g.multiplier <<= 1;
 
                             clock_ticks = new_ticks;
                             clock = Ticker::every(Duration::from_ticks(clock_ticks as u64));
