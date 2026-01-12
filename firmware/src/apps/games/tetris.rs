@@ -160,6 +160,8 @@ impl<'a> Tetris<'a> {
     }
 
     fn clear_lines(&mut self) {
+        let mut cleared = 0;
+
         for y in 0..Framebuffer::HEIGHT {
             let full = self.board[y] == ((1 << (WIDTH as u32) ) - 1) as u8;
             if full {
@@ -167,9 +169,11 @@ impl<'a> Tetris<'a> {
                     self.board[y_up] = self.board[y_up - 1];
                 }
                 self.board[0] = 0;
-                self.score += 1;
+                cleared += 1;
             }
         }
+
+        self.score += cleared * cleared;
     }
 
     pub fn input(&mut self, but: Button) {
