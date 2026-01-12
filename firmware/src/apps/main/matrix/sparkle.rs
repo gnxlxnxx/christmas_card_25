@@ -20,7 +20,7 @@ pub async fn run() -> ! {
                 }
             }
             Either::Second(()) => {
-                for row in Matrix::fb().0.iter() {
+                for row in &Matrix::fb().0 {
                     for field in row {
                         let cur = field.load(Ordering::Relaxed) as u32;
                         field.store((((cur << 7) - cur) >> 7) as u8, Ordering::Relaxed);

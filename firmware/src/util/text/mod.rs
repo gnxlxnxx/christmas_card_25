@@ -12,7 +12,7 @@ use crate::{
 pub const TEXT_DURATION: Duration = Duration::from_millis(75);
 pub const TEXT_BRIGHTNESS: u8 = 64;
 
-const _: () = assert!(Framebuffer::HEIGHT >= 9);
+const _: () = assert!(Framebuffer::HEIGHT == 9);
 
 fn move_left(fb: &Framebuffer) {
     for row in fb.0.iter() {
@@ -41,12 +41,7 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
         clock.next().await;
         move_left(fb);
 
-        let glyph = Letter::get(c).0;
-
-        let mut i = 0;
-        while i < 5 {
-            let mut col = glyph[i];
-
+        for mut col in Letter::get(c).0 {
             let downshift = match Letter::downshift(col) {
                 Some(n) => n,
                 None => break,
@@ -60,8 +55,6 @@ pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
                 fb.0[r].last().unwrap().store(val, Ordering::Relaxed);
                 col >>= 1;
             }
-
-            i += 1;
         }
     }
 }

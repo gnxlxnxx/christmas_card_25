@@ -29,8 +29,11 @@ pub async fn run() -> ! {
                     }
                 }
 
-                for (t_row, b_row) in fb.0.iter().rev().skip(2).zip(fb.0.iter().rev().skip(1)) {
-                    for (t, b) in t_row.iter().zip(b_row).rev() {
+                for i in (0..fb.0.len() - 2).rev() {
+                    let t_row = &fb.0[i];
+                    let b_row = &fb.0[i + 1];
+
+                    for (t, b) in t_row.iter().zip(b_row) {
                         b.store(t.load(Ordering::Relaxed), Ordering::Relaxed);
                     }
                 }
