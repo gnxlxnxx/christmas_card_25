@@ -134,7 +134,7 @@ pub async fn run(filt_ws2812: &mut FilteredWs2812<'_>) {
 
                 if let Either::First(Event { pressed: true, button }) = select(
                     Buttons::event(),
-                    text::scroll(game.to_str(), TEXT_BRIGHTNESS, &mut clock)
+                    text::scroll(game.to_str(), TEXT_BRIGHTNESS, &mut clock),
                 ).await {
                     match button {
                         Button::Start => break,

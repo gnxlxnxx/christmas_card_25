@@ -253,7 +253,11 @@ impl<'a> Game<'a> {
             FieldState::Empty => (),
             FieldState::Snake(_) | FieldState::SnakeHead => return true,
             FieldState::Maultasch => {
-                self.score += if self.length > MULTIPLIER_MIN_LENGTH { self.multiplier } else { 1 };
+                self.score += if self.length > MULTIPLIER_MIN_LENGTH {
+                    self.multiplier
+                } else {
+                    1
+                };
 
                 self.length_increase += 2;
                 self.field.gen_maultasch(&mut self.rng);
@@ -268,7 +272,9 @@ impl<'a> Game<'a> {
 
 pub async fn run() {
     let fb = Matrix::fb();
-    const { assert!(INITIAL_DURATION.as_ticks() <= u32::MAX as u64); }
+    const {
+        assert!(INITIAL_DURATION.as_ticks() <= u32::MAX as u64);
+    }
     let mut clock_ticks = INITIAL_DURATION.as_ticks() as u32;
     let mut clock = Ticker::every(Duration::from_ticks(clock_ticks as u64));
     let mut g = Game::new(fb);
@@ -286,7 +292,9 @@ pub async fn run() {
                         break GameResult { has_won: false, score: g.score };
                     } else {
                         let new_ticks = clock_ticks / 2;
-                        const { assert!(matrix::FRAME_DURATION.as_ticks() <= u32::MAX as u64); }
+                        const {
+                            assert!(matrix::FRAME_DURATION.as_ticks() <= u32::MAX as u64);
+                        }
                         if new_ticks >= matrix::FRAME_DURATION.as_ticks() as u32 {
                             g.multiplier <<= 1;
 

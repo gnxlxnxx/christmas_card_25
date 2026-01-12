@@ -158,7 +158,7 @@ impl<'a> Tetris<'a> {
         let mut cleared = 0;
 
         for y in 0..Framebuffer::HEIGHT {
-            let full = self.board[y] == ((1 << (WIDTH as u32) ) - 1) as u8;
+            let full = self.board[y] == ((1 << (WIDTH as u32)) - 1) as u8;
             if full {
                 for y_up in (1..=y).rev() {
                     self.board[y_up] = self.board[y_up - 1];
@@ -203,7 +203,7 @@ impl<'a> Tetris<'a> {
             self.clear_lines();
 
             if self.spawn() {
-                return Some(GameResult { score: self.score })
+                return Some(GameResult { score: self.score });
             }
         } else {
             self.current = p;

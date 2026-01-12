@@ -114,7 +114,9 @@ impl<const TOP: bool> Player<TOP> {
         let row = &fb.0[Self::PADDLE_Y as usize];
 
         for x in self.paddle_x..(self.paddle_x + Self::PADDLE_LEN) {
-            if let Ok(x) = usize::try_from(x) && let Some(field) = row.get(x) {
+            if let Ok(x) = usize::try_from(x)
+                && let Some(field) = row.get(x)
+            {
                 field.store(PADDLE_BRIGHTNESS, Ordering::Relaxed);
             }
         }
@@ -142,11 +144,7 @@ enum CollideResult {
 
 impl CollideResult {
     pub fn or(self, f: impl FnOnce() -> Self) -> Self {
-        if self == Self::None {
-            f()
-        } else {
-            self
-        }
+        if self == Self::None { f() } else { self }
     }
 }
 
@@ -168,7 +166,8 @@ impl Game {
     }
 
     pub fn advance(&mut self) -> CollideResult {
-        let res = self.top.collide_ball(&mut self.ball).or(|| self.bottom.collide_ball(&mut self.ball));
+        let res = self.top.collide_ball(&mut self.ball)
+            .or(|| self.bottom.collide_ball(&mut self.ball));
 
         if res == CollideResult::Missed {
             self.top.reset_paddle();
@@ -201,7 +200,9 @@ impl Game {
 pub async fn run() {
     let mut g = Game::new();
     let mut next_tick = Instant::now() + RESET_PAUSE_DURATION;
-    const { assert!(INITIAL_DURATION.as_ticks() <= u32::MAX as u64); }
+    const {
+        assert!(INITIAL_DURATION.as_ticks() <= u32::MAX as u64);
+    }
     let mut ticks = INITIAL_DURATION.as_ticks() as u32;
 
     loop {
@@ -213,24 +214,30 @@ pub async fn run() {
                 Button::Select => g.top.move_paddle(1),
                 Button::L => g.bottom.move_paddle(-1),
                 Button::R => g.bottom.move_paddle(1),
-            }
+            },
             Either::First(Event { pressed: false, button: _ }) => (),
-            Either::Second(()) => next_tick += match g.advance() {
-                CollideResult::Missed => if g.has_ended() {
-                    break
-                } else {
-                    ticks = INITIAL_DURATION.as_ticks() as u32;
+            Either::Second(()) => {
+                next_tick += match g.advance() {
+                    CollideResult::Missed => {
+                        if g.has_ended() {
+                            break;
+                        } else {
+                            ticks = INITIAL_DURATION.as_ticks() as u32;
 
-                    RESET_PAUSE_DURATION
-                }
-                CollideResult::Hit => {
-                    const { assert!(matrix::FRAME_DURATION.as_ticks() <= u32::MAX as u64); }
-                    ticks = (((ticks << 5) - ticks) >> 5)
-                        .max(matrix::FRAME_DURATION.as_ticks() as u32);
+                            RESET_PAUSE_DURATION
+                        }
+                    }
+                    CollideResult::Hit => {
+                        const {
+                            assert!(matrix::FRAME_DURATION.as_ticks() <= u32::MAX as u64);
+                        }
+                        ticks = (((ticks << 5) - ticks) >> 5)
+                            .max(matrix::FRAME_DURATION.as_ticks() as u32);
 
-                    Duration::from_ticks(ticks as u64)
+                        Duration::from_ticks(ticks as u64)
+                    }
+                    CollideResult::None => Duration::from_ticks(ticks as u64),
                 }
-                CollideResult::None => Duration::from_ticks(ticks as u64),
             }
         }
     }
