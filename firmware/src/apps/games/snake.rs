@@ -14,7 +14,7 @@ const HEAD_BRIGHTNESS: u8 = 64;
 const SNAKE_BRIGHTNESS: u8 = 32;
 const MAULTASCH_BRIGHTNESS: u8 = 96;
 
-const MULTIPLIER_MIN_LENGTH: u8 = 2 * (Framebuffer::WIDTH + Framebuffer::HEIGHT) as u8;
+const MULTIPLIER_MIN_LENGTH: u8 = 2 * (Framebuffer::WIDTH + Framebuffer::HEIGHT - 2) as u8;
 const INITIAL_DURATION: Duration = Duration::from_millis(250);
 
 const _: () = assert!(Framebuffer::WIDTH * Framebuffer::HEIGHT <= u8::MAX as usize);
