@@ -120,7 +120,7 @@ impl Game {
     }
 }
 
-pub async fn run(filt_ws2812: &mut FilteredWs2812<'_>) {
+pub async fn run(filt_ws2812: &mut FilteredWs2812) {
     let leds = filt_ws2812.target_mut();
     leds[1] = Color::new(0, 0, 0);
     leds[4] = Color::new(0, 0, 0);

@@ -28,7 +28,7 @@ impl Mode {
         };
     }
 
-    async fn animate(&mut self, filt_ws2812: &mut FilteredWs2812<'_>) -> [Color; ws2812::LEDS] {
+    async fn animate(&mut self, filt_ws2812: &mut FilteredWs2812) -> [Color; ws2812::LEDS] {
         match self {
             Self::Fire => fire::run(filt_ws2812).await,
             Self::Snowball => snowball::run(filt_ws2812).await,
@@ -37,7 +37,7 @@ impl Mode {
     }
 }
 
-pub async fn run(filt_ws2812: &mut FilteredWs2812<'_>, next_event: &Event) -> ! {
+pub async fn run(filt_ws2812: &mut FilteredWs2812, next_event: &Event) -> ! {
     let mut mode = Mode::new();
 
     loop {

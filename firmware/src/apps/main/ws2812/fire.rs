@@ -4,7 +4,7 @@ use crate::util::ws2812::{FilteredWs2812, HUETABLE, SINTABLE};
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
-pub async fn run(filt_ws2812: &mut FilteredWs2812<'_>) -> ! {
+pub async fn run(filt_ws2812: &mut FilteredWs2812) -> ! {
     let mut progress_clock = Ticker::every(Duration::from_millis(100));
     let mut update_clock = Ticker::every(Duration::from_millis(10));
 

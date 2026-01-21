@@ -8,7 +8,7 @@ pub mod drivers;
 pub mod util;
 mod vectors;
 
-use ch32_hal::{self as hal};
+use ch32_hal as hal;
 use qingke::{interrupt::Priority, pfic};
 use ch32_metapac::{self as pac, Interrupt, rcc::vals::Sw};
 use embassy_futures::block_on;
@@ -64,8 +64,8 @@ fn main() -> ! {
     let btn = buttons::Pins::new(p.PD7, p.PD4, p.PC0, p.PD3);
     drivers::timer_init(led, btn, p.TIM1, p.TIM2);
 
-    let mut ws2812 = drivers::ws2812::Ws2812::new(p.PC6, p.SPI1, p.DMA1_CH3);
-    let mut filt_ws2812 = FilteredWs2812::new(&mut ws2812);
+    let ws2812 = unsafe { drivers::ws2812::Ws2812::init() };
+    let mut filt_ws2812 = FilteredWs2812::new(ws2812);
 
     drivers::usb::init(p.PC3, p.PC2, p.AFIO, p.SYSTICK);
     drivers::usb::usb_up(p.PC5);

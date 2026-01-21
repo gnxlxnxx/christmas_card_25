@@ -1,10 +1,8 @@
 use core::sync::atomic::{Ordering, compiler_fence};
 
 use crate::util::sync::poll_while;
-use ch32_hal as hal;
-use hal::interrupt::InterruptExt;
-use hal::pac;
-use hal::{Peri, peripherals};
+use ch32_metapac::{self as pac, Interrupt};
+use qingke::pfic;
 
 pub const LEDS: usize = 6;
 
@@ -85,11 +83,7 @@ pub struct Ws2812 {
 }
 
 impl Ws2812 {
-    pub fn new(
-        _pin: Peri<'static, peripherals::PC6>,
-        _spi1: Peri<'static, peripherals::SPI1>,
-        _dma1_ch3: Peri<'static, peripherals::DMA1_CH3>,
-    ) -> Self {
+    pub unsafe fn init() -> Self {
         // Remap is implicitly set as 0
         pac::GPIOC.cfglr().modify(|w| {
             w.set_mode(6, pac::gpio::vals::Mode::OUTPUT_10MHZ);
@@ -116,7 +110,7 @@ impl Ws2812 {
             w.set_dff(true); // send/receive u16
         });
 
-        hal::interrupt::DMA1_CHANNEL3.pend();
+        unsafe { pfic::pend_interrupt(Interrupt::DMA1_CHANNEL3 as u8); }
 
         Self { _private: () }
     }
@@ -124,9 +118,9 @@ impl Ws2812 {
     pub async fn write(&mut self, colors: &[Color; LEDS]) {
         // Wait for previous SPI to be done
         poll_while(|| {
-            !hal::interrupt::DMA1_CHANNEL3.is_pending() || pac::SPI1.statr().read().bsy()
+            !pfic::is_pending(Interrupt::DMA1_CHANNEL3 as u8) || pac::SPI1.statr().read().bsy()
         }).await;
-        hal::interrupt::DMA1_CHANNEL3.unpend();
+        unsafe { pfic::unpend_interrupt(Interrupt::DMA1_CHANNEL3 as u8); }
         compiler_fence(Ordering::Acquire);
 
         #[allow(static_mut_refs)]
@@ -141,6 +135,7 @@ impl Ws2812 {
         ch.par().write_value(tx_dst as u32); // PADDR
         ch.mar().write_value(spi_dma_buf.as_flattened() as *const _ as *const u16 as u32); // MADDR
         ch.ndtr().write(|w| w.set_ndt(spi_dma_buf.as_flattened().len() as u16)); // CNTR
+
         compiler_fence(Ordering::Release);
         ch.cr().write(|w| {
             w.set_psize(pac::dma::vals::Size::BITS16);

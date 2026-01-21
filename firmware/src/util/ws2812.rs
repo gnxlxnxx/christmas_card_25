@@ -38,14 +38,14 @@ pub const SINTABLE: [u8; 256] = [
     0x4f, 0x52, 0x55, 0x58, 0x5b, 0x5e, 0x61, 0x64, 0x67, 0x6a, 0x6d, 0x70, 0x73, 0x76, 0x79, 0x7d,
 ];
 
-pub struct FilteredWs2812<'a> {
-    ws2812: &'a mut Ws2812,
+pub struct FilteredWs2812 {
+    ws2812: Ws2812,
     output: [Color; ws2812::LEDS],
     target: [Color; ws2812::LEDS],
 }
 
-impl<'a> FilteredWs2812<'a> {
-    pub fn new(ws2812: &'a mut Ws2812) -> Self {
+impl<'a> FilteredWs2812 {
+    pub fn new(ws2812: Ws2812) -> Self {
         Self {
             ws2812,
             output: [Color::new(0, 0, 0); ws2812::LEDS],
