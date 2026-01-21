@@ -8,16 +8,10 @@ pub mod drivers;
 pub mod util;
 mod vectors;
 
-use ch32_hal as hal;
 use qingke::{interrupt::Priority, pfic};
 use ch32_metapac::{self as pac, Interrupt, rcc::vals::Sw};
 use embassy_futures::block_on;
 use panic_halt as _;
-
-use drivers::{
-    buttons::{self},
-    matrix::{self},
-};
 
 use crate::apps::{games, main};
 use crate::util::ws2812::FilteredWs2812;
@@ -56,18 +50,12 @@ fn main() -> ! {
         pfic::set_priority(Interrupt::TIM1_UP as u8, Priority::P8.into());
     }
 
-    let p = unsafe { hal::Peripherals::steal() };
-
     unsafe { drivers::usb::init(); }
 
     let ws2812 = unsafe { drivers::ws2812::Ws2812::init() };
     let mut filt_ws2812 = FilteredWs2812::new(ws2812);
 
-    let led = matrix::Pins::new(
-        p.PD0, p.PA2, p.PA1, p.PD6, p.PD5, p.PD2, p.PC7, p.PC4, p.PC1,
-    );
-    let btn = buttons::Pins::new(p.PD7, p.PD4, p.PC0, p.PD3);
-    drivers::timer_init(led, btn, p.TIM1, p.TIM2);
+    unsafe { drivers::timer_init(); }
 
     block_on(async {
         loop {

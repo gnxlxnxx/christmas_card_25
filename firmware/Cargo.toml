@@ -10,9 +10,6 @@ name = "fsei-xmas-card-25"
 harness = false # do not use the built in cargo test harness -> resolve rust-analyzer errors
 
 [dependencies]
-ch32-hal = { git = "https://github.com/lukasfink1/ch32-hal.git", branch = "fsei-xmas-card-25", default-features = false, features = [ 
-    "ch32v003f4u6",
-] }
 ch32-metapac = { git = "https://github.com/ch32-rs/ch32-metapac", features = [
     "ch32v003f4u6"
 ]}

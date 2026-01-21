@@ -3,15 +3,7 @@ use core::{
     sync::atomic::{AtomicU8, Ordering},
 };
 
-use ch32_hal::{
-    Peri,
-    gpio::{AnyPin, Pin},
-    pac::{
-        self,
-        gpio::vals::{Cnf, Mode},
-    },
-    peripherals,
-};
+use ch32_metapac::{self as pac, gpio::vals::{Cnf, Mode}};
 use embassy_time::Duration;
 
 // from itertools import batched
@@ -55,6 +47,18 @@ const GAMMA_LUT: [[u8; 3]; 128] = [
     [207, 209, 0xee], [211, 213, 0xde], [215, 217, 0xee], [219, 221, 0xfe],
     [224, 226, 0x10], [228, 230, 0x32], [232, 234, 0x64], [236, 238, 0xa8],
     [240, 242, 0xec], [245, 247, 0x30], [249, 251, 0x96], [253, 255, 0xfc],
+];
+
+const PINS: [(pac::gpio::Gpio, usize); ROWS] = [
+        (pac::GPIOD, 0),
+        (pac::GPIOA, 2),
+        (pac::GPIOA, 1),
+        (pac::GPIOD, 6),
+        (pac::GPIOD, 5),
+        (pac::GPIOD, 2),
+        (pac::GPIOC, 7),
+        (pac::GPIOC, 4),
+        (pac::GPIOC, 1),
 ];
 
 pub const FRAME_DURATION: Duration = Duration::from_ticks(2 * Framebuffer::HEIGHT as u64);
@@ -132,20 +136,10 @@ impl Framebuffer {
     }
 }
 
-pub struct Pins<'a>([Peri<'a, AnyPin>; ROWS]);
+pub(super) struct Pins;
 
-impl<'a> Pins<'a> {
-    pub fn new(
-        led1: Peri<'a, peripherals::PD0>,
-        led2: Peri<'a, peripherals::PA2>,
-        led3: Peri<'a, peripherals::PA1>,
-        led4: Peri<'a, peripherals::PD6>,
-        led5: Peri<'a, peripherals::PD5>,
-        led6: Peri<'a, peripherals::PD2>,
-        led7: Peri<'a, peripherals::PC7>,
-        led8: Peri<'a, peripherals::PC4>,
-        led9: Peri<'a, peripherals::PC1>,
-    ) -> Self {
+impl Pins {
+    pub(super) fn init() {
         // Set all pins high
         pac::GPIOA.bshr().write(|w| {
             w.set_bs(1, true);
@@ -162,21 +156,9 @@ impl<'a> Pins<'a> {
             w.set_bs(5, true);
             w.set_bs(6, true);
         });
-
-        Self([
-            led1.into(),
-            led2.into(),
-            led3.into(),
-            led4.into(),
-            led5.into(),
-            led6.into(),
-            led7.into(),
-            led8.into(),
-            led9.into(),
-        ])
     }
 
-    pub(super) fn set_float_all(&mut self) {
+    pub(super) fn set_float_all() {
         pac::GPIOA.cfglr().modify(|w| {
             w.set_mode(1, Mode::INPUT);
             w.set_cnf(1, Cnf::FLOATING_IN__OPEN_DRAIN_OUT);
@@ -205,16 +187,13 @@ impl<'a> Pins<'a> {
         });
     }
 
-    pub(super) fn set_high(&mut self, row: usize) {
-        let pin = &self.0[row];
-
-        let port = pin.port().into();
-        let pin = pin.pin().into();
+    pub(super) fn set_high(row: usize) {
+        let pin = PINS[row];
 
         critical_section::with(|_| {
-            pac::GPIO(port).cfglr().modify(|w| {
-                w.set_mode(pin, Mode::OUTPUT_50MHZ);
-                w.set_cnf(pin, Cnf::ANALOG_IN__PUSH_PULL_OUT);
+            pin.0.cfglr().modify(|w| {
+                w.set_mode(pin.1, Mode::OUTPUT_50MHZ);
+                w.set_cnf(pin.1, Cnf::ANALOG_IN__PUSH_PULL_OUT);
             });
         });
     }

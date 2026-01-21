@@ -1,6 +1,6 @@
 use crate::drivers::buttons::{Button, Buttons, Event};
 use crate::drivers::flash;
-use crate::matrix::{Framebuffer, Matrix};
+use crate::drivers::matrix::{Framebuffer, Matrix};
 use crate::util::rand::WhiteNoiseGenerator;
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};

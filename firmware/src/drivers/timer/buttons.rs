@@ -4,7 +4,7 @@ use core::{
     task::Poll,
 };
 
-use ch32_hal::{Peri, pac, peripherals};
+use ch32_metapac as pac;
 
 const HIST_LOW: u16 = 65;
 const HIST_HIGH: u16 = 70;
@@ -19,25 +19,10 @@ static BTN_STATE: Group<AtomicBool> = Group([
 
 static BTN_EVENT_SIGNAL: AtomicU8 = AtomicU8::new(0);
 
-#[derive(Debug)]
-pub struct Pins<'a> {
-    _start: Peri<'a, peripherals::PD7>,
-    _select: Peri<'a, peripherals::PD4>,
-    _l: Peri<'a, peripherals::PC0>,
-    _r: Peri<'a, peripherals::PD3>,
-}
+pub(super) struct Pins;
 
-impl<'a> Pins<'a> {
-    pub fn new(
-        start: Peri<'a, peripherals::PD7>,
-        select: Peri<'a, peripherals::PD4>,
-        l: Peri<'a, peripherals::PC0>,
-        r: Peri<'a, peripherals::PD3>,
-    ) -> Self {
-        Self { _start: start, _select: select, _l: l, _r: r }
-    }
-
-    pub(super) fn set_high_all(&mut self) {
+impl Pins {
+    pub(super) fn set_high_all() {
         pac::GPIOC.bshr().write(|w| {
             w.set_bs(0, true);
         });
@@ -48,7 +33,7 @@ impl<'a> Pins<'a> {
         });
     }
 
-    pub(super) fn set_low_all(&mut self) {
+    pub(super) fn set_low_all() {
         pac::GPIOC.bshr().write(|w| {
             w.set_br(0, true);
         });
