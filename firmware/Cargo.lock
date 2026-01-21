@@ -56,7 +56,7 @@ version = "0.1.0"
 source = "git+https://github.com/lukasfink1/ch32-hal.git?branch=fsei-xmas-card-25#37a404770390564b7372d094d86dd7586b3058dc"
 dependencies = [
  "bitmaps",
- "ch32-metapac",
+ "ch32-metapac 0.1.0 (git+https://github.com/ch32-rs/ch32-metapac?rev=b1cbc7a98e43af3fd3170821654784e2c01cb26b)",
  "critical-section",
  "embassy-futures",
  "embassy-hal-internal",
@@ -82,6 +82,15 @@ version = "0.1.0"
 source = "git+https://github.com/ch32-rs/ch32-metapac?rev=b1cbc7a98e43af3fd3170821654784e2c01cb26b#b1cbc7a98e43af3fd3170821654784e2c01cb26b"
 dependencies = [
  "riscv 0.11.1",
+ "vcell",
+]
+
+[[package]]
+name = "ch32-metapac"
+version = "0.1.0"
+source = "git+https://github.com/ch32-rs/ch32-metapac#7cd6fb70d07de3a987c63d0d8f5547bb8261e403"
+dependencies = [
+ "riscv 0.12.1",
  "vcell",
 ]
 
@@ -233,6 +242,7 @@ name = "fsei-xmas-card-25"
 version = "0.1.0"
 dependencies = [
  "ch32-hal",
+ "ch32-metapac 0.1.0 (git+https://github.com/ch32-rs/ch32-metapac)",
  "critical-section",
  "embassy-futures",
  "embassy-sync",
@@ -513,6 +523,19 @@ dependencies = [
 
 [[package]]
 name = "riscv"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5ea8ff73d3720bdd0a97925f0bf79ad2744b6da8ff36be3840c48ac81191d7a7"
+dependencies = [
+ "critical-section",
+ "embedded-hal 1.0.0",
+ "paste",
+ "riscv-macros 0.1.0",
+ "riscv-pac",
+]
+
+[[package]]
+name = "riscv"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05cfa3f7b30c84536a9025150d44d26b8e1cc20ddf436448d74cd9591eefb25"
@@ -520,8 +543,19 @@ dependencies = [
  "critical-section",
  "embedded-hal 1.0.0",
  "paste",
- "riscv-macros",
+ "riscv-macros 0.3.0",
  "riscv-pac",
+]
+
+[[package]]
+name = "riscv-macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f265be5d634272320a7de94cea15c22a3bfdd4eb42eb43edc528415f066a1f25"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.114",
 ]
 
 [[package]]

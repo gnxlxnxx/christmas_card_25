@@ -13,6 +13,9 @@ harness = false # do not use the built in cargo test harness -> resolve rust-ana
 ch32-hal = { git = "https://github.com/lukasfink1/ch32-hal.git", branch = "fsei-xmas-card-25", default-features = false, features = [ 
     "ch32v003f4u6",
 ] }
+ch32-metapac = { git = "https://github.com/ch32-rs/ch32-metapac", features = [
+    "ch32v003f4u6"
+]}
 embedded-hal = "1.0.0"
 
 embassy-futures = "0.1.2"
@@ -23,7 +26,7 @@ embassy-time-driver = { version = "0.2.1", features = [ "tick-hz-10_000" ] }
 panic-halt = "1.0.0"
 critical-section = "1.2.0"
 
-qingke-rt = "0.6.1"
+qingke-rt = { version = "0.6.1", features = [ "v2" ] }
 qingke = { version = "0.6.1", features = [ "critical-section-impl" ] }
 
 usbd-hid = "0.9.0"
