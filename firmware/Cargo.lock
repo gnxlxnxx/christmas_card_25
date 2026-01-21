@@ -163,7 +163,6 @@ dependencies = [
  "embassy-sync",
  "embassy-time",
  "embassy-time-driver",
- "embedded-hal 1.0.0",
  "panic-halt",
  "qingke",
  "qingke-rt",

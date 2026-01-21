@@ -13,7 +13,6 @@ harness = false # do not use the built in cargo test harness -> resolve rust-ana
 ch32-metapac = { git = "https://github.com/ch32-rs/ch32-metapac", features = [
     "ch32v003f4u6"
 ]}
-embedded-hal = "1.0.0"
 
 embassy-futures = "0.1.2"
 embassy-sync = "0.7.2"
