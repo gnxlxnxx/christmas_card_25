@@ -1,18 +1,18 @@
 // Almost fully copied from rv003usb
 // MIT License
-
+//
 // Copyright (c) 2023 CNLohr
-
+//
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights
 // to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
-
+//
 // The above copyright notice and this permission notice shall be included in all
 // copies or substantial portions of the Software.
-
+//
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 // FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -20,7 +20,8 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-use ch32_hal::pac::{FLASH, PFIC, RCC, SYSTICK};
+
+use ch32_metapac::{FLASH, PFIC, RCC, SYSTICK};
 use core::arch::asm;
 use core::hint::unreachable_unchecked;
 use core::mem;
@@ -53,7 +54,7 @@ struct UsbUrb {
     w_length: u16,
 }
 
-pub struct UsbIf<const USB_BASE: usize, const DP: u8, const DM: u8, const EPS: usize> {
+pub struct UsbIf<const USB_BASE: usize, const DP: usize, const DM: usize, const EPS: usize> {
     current_endpoint: u32,
     my_address: u32,
     setup_request: u32,
@@ -65,10 +66,10 @@ pub struct UsbIf<const USB_BASE: usize, const DP: u8, const DM: u8, const EPS: u
     eps: [UsbEndpoint; EPS], // ENDPOINTS
 }
 
-impl<const USB_BASE: usize, const DP: u8, const DM: u8, const EPS: usize>
+impl<const USB_BASE: usize, const DP: usize, const DM: usize, const EPS: usize>
     UsbIf<USB_BASE, DP, DM, EPS>
 {
-    pub fn new(
+    pub const fn new(
         usb_handle_user_in_request: fn(*mut UsbEndpoint, *mut u8, i32, u32, &mut Self),
         get_descriptor_info: fn(u32) -> (*const u8, u16),
     ) -> Self {

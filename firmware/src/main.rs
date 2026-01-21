@@ -22,7 +22,7 @@ use drivers::{
 use crate::apps::{games, main};
 use crate::util::ws2812::FilteredWs2812;
 
-fn init_hsi_pll_48mhz() {
+unsafe fn init_hsi_pll_48mhz() {
     pac::RCC.ctlr().write(|w| {
         w.set_hsitrim(16);
         w.set_hsion(true);
@@ -36,7 +36,7 @@ fn init_hsi_pll_48mhz() {
 
 #[qingke_rt::entry]
 fn main() -> ! {
-    init_hsi_pll_48mhz();
+    unsafe { init_hsi_pll_48mhz(); }
 
     // Enable peripherals
     pac::RCC.apb2pcenr().write(|w| {
@@ -58,17 +58,16 @@ fn main() -> ! {
 
     let p = unsafe { hal::Peripherals::steal() };
 
+    unsafe { drivers::usb::init(); }
+
+    let ws2812 = unsafe { drivers::ws2812::Ws2812::init() };
+    let mut filt_ws2812 = FilteredWs2812::new(ws2812);
+
     let led = matrix::Pins::new(
         p.PD0, p.PA2, p.PA1, p.PD6, p.PD5, p.PD2, p.PC7, p.PC4, p.PC1,
     );
     let btn = buttons::Pins::new(p.PD7, p.PD4, p.PC0, p.PD3);
     drivers::timer_init(led, btn, p.TIM1, p.TIM2);
-
-    let ws2812 = unsafe { drivers::ws2812::Ws2812::init() };
-    let mut filt_ws2812 = FilteredWs2812::new(ws2812);
-
-    drivers::usb::init(p.PC3, p.PC2, p.AFIO, p.SYSTICK);
-    drivers::usb::usb_up(p.PC5);
 
     block_on(async {
         loop {

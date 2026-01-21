@@ -1,4 +1,4 @@
-use ch32_hal::pac::{
+use ch32_metapac::{
     FLASH,
     flash::regs::{Addr, Keyr, Modekeyr},
 };
