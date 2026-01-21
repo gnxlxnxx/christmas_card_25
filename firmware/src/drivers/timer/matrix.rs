@@ -49,16 +49,28 @@ const GAMMA_LUT: [[u8; 3]; 128] = [
     [240, 242, 0xec], [245, 247, 0x30], [249, 251, 0x96], [253, 255, 0xfc],
 ];
 
-const PINS: [(pac::gpio::Gpio, usize); ROWS] = [
-        (pac::GPIOD, 0),
-        (pac::GPIOA, 2),
-        (pac::GPIOA, 1),
-        (pac::GPIOD, 6),
-        (pac::GPIOD, 5),
-        (pac::GPIOD, 2),
-        (pac::GPIOC, 7),
-        (pac::GPIOC, 4),
-        (pac::GPIOC, 1),
+// const PINS: [(pac::gpio::Gpio, usize); ROWS] = [
+//         (pac::GPIOD, 0),
+//         (pac::GPIOA, 2),
+//         (pac::GPIOA, 1),
+//         (pac::GPIOD, 6),
+//         (pac::GPIOD, 5),
+//         (pac::GPIOD, 2),
+//         (pac::GPIOC, 7),
+//         (pac::GPIOC, 4),
+//         (pac::GPIOC, 1),
+// ];
+
+const PINS: [(u8, u8); ROWS] = [
+        (3, 0),
+        (0, 2),
+        (0, 1),
+        (3, 6),
+        (3, 5),
+        (3, 2),
+        (2, 7),
+        (2, 4),
+        (2, 1),
 ];
 
 pub const FRAME_DURATION: Duration = Duration::from_ticks(2 * Framebuffer::HEIGHT as u64);
@@ -191,9 +203,9 @@ impl Pins {
         let pin = PINS[row];
 
         critical_section::with(|_| {
-            pin.0.cfglr().modify(|w| {
-                w.set_mode(pin.1, Mode::OUTPUT_50MHZ);
-                w.set_cnf(pin.1, Cnf::ANALOG_IN__PUSH_PULL_OUT);
+            pac::GPIO(pin.0 as usize).cfglr().modify(|w| {
+                w.set_mode(pin.1 as usize, Mode::OUTPUT_50MHZ);
+                w.set_cnf(pin.1 as usize, Cnf::ANALOG_IN__PUSH_PULL_OUT);
             });
         });
     }
