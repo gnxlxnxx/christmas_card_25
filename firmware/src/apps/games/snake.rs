@@ -272,8 +272,7 @@ impl<'a> Game<'a> {
 
 pub async fn run() {
     let fb = Matrix::fb();
-    let mut clock_ticks = INITIAL_DURATION.as_ticks();
-    let mut clock = Ticker::every(Duration::from_ticks(clock_ticks));
+    let mut clock = Ticker::every(INITIAL_DURATION);
     let mut g = Game::new(fb);
     let mut paused = false;
 
@@ -288,12 +287,11 @@ pub async fn run() {
                     if paused {
                         break GameResult { has_won: false, score: g.score };
                     } else {
-                        let new_ticks = clock_ticks / 2;
-                        if new_ticks >= matrix::FRAME_DURATION.as_ticks() as u32 {
+                        let new_ticks = clock.duration().as_ticks() / 2;
+                        if new_ticks >= matrix::FRAME_DURATION.as_ticks() {
                             g.multiplier <<= 1;
 
-                            clock_ticks = new_ticks;
-                            clock = Ticker::every(Duration::from_ticks(clock_ticks));
+                            clock.set_duration(Duration::from_ticks(new_ticks));
                         }
                     }
                 }

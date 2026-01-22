@@ -98,7 +98,6 @@ impl<F: Future> Future for TimeoutFuture<F> {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Timer {
     expires_at: Instant,
-    yielded_once: bool,
 }
 
 impl Timer {
@@ -107,7 +106,6 @@ impl Timer {
     pub fn at(expires_at: Instant) -> Self {
         Self {
             expires_at,
-            yielded_once: false,
         }
     }
 
@@ -127,7 +125,6 @@ impl Timer {
     pub fn after(duration: Duration) -> Self {
         Self {
             expires_at: Instant::now() + duration,
-            yielded_once: false,
         }
     }
 
@@ -181,11 +178,10 @@ impl Unpin for Timer {}
 
 impl Future for Timer {
     type Output = ();
-    fn poll(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.yielded_once && self.expires_at <= Instant::now() {
+    fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
+        if self.expires_at <= Instant::now() {
             Poll::Ready(())
         } else {
-            self.yielded_once = true;
             Poll::Pending
         }
     }
@@ -243,6 +239,16 @@ impl Ticker {
     pub fn every(duration: Duration) -> Self {
         let expires_at = Instant::now() + duration;
         Self { expires_at, duration }
+    }
+
+    /// Return the current duration value
+    pub fn duration(&self) -> Duration {
+        self.duration
+    }
+
+    /// Sets a new duration value
+    pub fn set_duration(&mut self, val: Duration) {
+        self.duration = val
     }
 
     /// Resets the ticker back to its original state.
