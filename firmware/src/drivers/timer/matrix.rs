@@ -73,7 +73,7 @@ const PINS: [(u8, u8); ROWS] = [
         (2, 1),
 ];
 
-pub const FRAME_DURATION: Duration = Duration::from_ticks(2 * Framebuffer::HEIGHT as u64);
+pub const FRAME_DURATION: Duration = Duration::from_ticks(2 * Framebuffer::HEIGHT as u32);
 
 pub(super) const ROWS: usize = 9;
 pub(super) const PWM_MAX: u16 = (GAMMA_LUT[127][1] as u16) << 4 | (GAMMA_LUT[127][2] as u16) >> 4;

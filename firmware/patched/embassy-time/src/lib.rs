@@ -33,7 +33,7 @@ pub use embassy_time_driver::TICK_HZ;
 pub use instant::Instant;
 pub use timer::{with_deadline, with_timeout, Ticker, TimeoutError, Timer, WithTimeout};
 
-const fn gcd(a: u64, b: u64) -> u64 {
+const fn gcd(a: u32, b: u32) -> u32 {
     if b == 0 {
         a
     } else {
@@ -41,9 +41,9 @@ const fn gcd(a: u64, b: u64) -> u64 {
     }
 }
 
-pub(crate) const GCD_1K: u64 = gcd(TICK_HZ, 1_000);
-pub(crate) const GCD_1M: u64 = gcd(TICK_HZ, 1_000_000);
-pub(crate) const GCD_1G: u64 = gcd(TICK_HZ, 1_000_000_000);
+pub(crate) const GCD_1K: u32 = gcd(TICK_HZ, 1_000);
+pub(crate) const GCD_1M: u32 = gcd(TICK_HZ, 1_000_000);
+pub(crate) const GCD_1G: u32 = gcd(TICK_HZ, 1_000_000_000);
 
 #[cfg(feature = "defmt-timestamp-uptime-s")]
 defmt::timestamp! {"{=u64}", Instant::now().as_secs() }

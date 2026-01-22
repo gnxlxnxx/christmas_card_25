@@ -1,34 +1,27 @@
-use core::cell::Cell;
+use core::{sync::atomic::{AtomicI32, Ordering}};
 
-use critical_section::Mutex;
 use embassy_time_driver::{Driver, time_driver_impl};
 
 time_driver_impl!(static TIME_DRIVER: TimeDriver = TimeDriver {
-    now: Mutex::new(Cell::new(0)),
+    now: AtomicI32::new(0),
 });
 
 #[derive(Debug)]
 pub(super) struct TimeDriver {
-    now: Mutex<Cell<u64>>,
+    now: AtomicI32,
 }
 
 impl TimeDriver {
     pub(super) fn advance(&self) {
-        critical_section::with(|cs| {
-            let now_box = self.now.borrow(cs);
-
-            let now = now_box.get() + 1;
-            now_box.set(now);
-        });
+        let now = self.now.load(Ordering::Relaxed);
+        self.now.store(now.wrapping_add(1), Ordering::Relaxed);
     }
 }
 
 impl Driver for TimeDriver {
-    fn now(&self) -> u64 {
-        critical_section::with(|cs| self.now.borrow(cs).get())
+    fn now(&self) -> i32 {
+        self.now.load(Ordering::Relaxed)
     }
-
-    fn schedule_wake(&self, _at: u64, _waker: &core::task::Waker) {}
 }
 
 pub(super) fn time_driver() -> &'static TimeDriver {

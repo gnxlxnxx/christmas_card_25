@@ -199,16 +199,13 @@ impl Game {
 
 pub async fn run() {
     let mut g = Game::new();
-    let mut next_tick = Instant::now() + RESET_PAUSE_DURATION;
-    const {
-        assert!(INITIAL_DURATION.as_ticks() <= u32::MAX as u64);
-    }
-    let mut ticks = INITIAL_DURATION.as_ticks() as u32;
+    let mut next_instant = Instant::now() + RESET_PAUSE_DURATION;
+    let mut duration = INITIAL_DURATION;
 
     loop {
         g.draw(Matrix::fb());
 
-        match select(Buttons::event(), Timer::at(next_tick)).await {
+        match select(Buttons::event(), Timer::at(next_instant)).await {
             Either::First(Event { pressed: true, button }) => match button {
                 Button::Start => g.top.move_paddle(-1),
                 Button::Select => g.top.move_paddle(1),
@@ -217,26 +214,24 @@ pub async fn run() {
             },
             Either::First(Event { pressed: false, button: _ }) => (),
             Either::Second(()) => {
-                next_tick += match g.advance() {
+                next_instant += match g.advance() {
                     CollideResult::Missed => {
                         if g.has_ended() {
                             break;
                         } else {
-                            ticks = INITIAL_DURATION.as_ticks() as u32;
+                            duration = INITIAL_DURATION;
 
                             RESET_PAUSE_DURATION
                         }
                     }
                     CollideResult::Hit => {
-                        const {
-                            assert!(matrix::FRAME_DURATION.as_ticks() <= u32::MAX as u64);
-                        }
-                        ticks = (((ticks << 5) - ticks) >> 5)
-                            .max(matrix::FRAME_DURATION.as_ticks() as u32);
+                        let dur = duration.as_ticks();
+                        duration = Duration::from_ticks(((dur << 5) - dur) >> 5)
+                            .max(matrix::FRAME_DURATION);
 
-                        Duration::from_ticks(ticks as u64)
+                        duration
                     }
-                    CollideResult::None => Duration::from_ticks(ticks as u64),
+                    CollideResult::None => duration,
                 }
             }
         }
