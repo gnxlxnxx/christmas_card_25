@@ -8,7 +8,7 @@ use crate::{
     },
     util::{
         itoa::utoa10,
-        rand::WhiteNoiseGenerator,
+        rand::Rng,
         text::{self, TEXT_BRIGHTNESS, TEXT_DURATION},
         ws2812::{FilteredWs2812, HUETABLE},
     },
@@ -55,7 +55,7 @@ async fn wait_for_start_or_select() {
     ) {}
 }
 
-fn set_ws2812_led_random(led: &mut Color, enabled: bool, noisegen: &mut WhiteNoiseGenerator) {
+fn set_ws2812_led_random(led: &mut Color, enabled: bool, noisegen: &mut Rng) {
     if enabled {
         if *led == Color::new(0, 0, 0) {
             let ang = noisegen.rand8() as usize;
@@ -149,7 +149,7 @@ pub async fn run(filt_ws2812: &mut FilteredWs2812) {
         },
         async {
             let mut clock = Ticker::every(Duration::from_millis(10));
-            let mut noisegen = WhiteNoiseGenerator::new();
+            let mut noisegen = Rng::new();
 
             loop {
                 let leds = filt_ws2812.target_mut();

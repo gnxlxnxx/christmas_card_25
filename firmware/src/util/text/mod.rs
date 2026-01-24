@@ -2,7 +2,7 @@ mod font;
 
 use core::sync::atomic::Ordering;
 
-use embassy_time::{Duration, Ticker};
+use embassy_time::Duration;
 
 use crate::{
     drivers::matrix::{Framebuffer, Matrix},
@@ -12,10 +12,13 @@ use crate::{
 pub const TEXT_DURATION: Duration = Duration::from_millis(75);
 pub const TEXT_BRIGHTNESS: u8 = 64;
 
-const _: () = assert!(Framebuffer::HEIGHT == 9);
+const _: () = {
+    assert!(Framebuffer::HEIGHT == 9);
+    assert!(Letter::MAX_WIDTH <= u8::MAX as usize);
+};
 
-fn move_left(fb: &Framebuffer) {
-    for row in fb.0.iter() {
+fn move_left() {
+    for row in Matrix::fb().0.iter() {
         let len = row.len();
         if len == 0 {
             continue;
@@ -30,31 +33,46 @@ fn move_left(fb: &Framebuffer) {
     }
 }
 
-pub fn clear_scroll(clock: &mut Ticker) -> impl Future<Output = ()> {
-    scroll(b"EE", 0, clock)
+pub struct TextScroller {
+    pos: usize,
+    col: u8,
 }
 
-pub async fn scroll(text: &[u8], brightness: u8, clock: &mut Ticker) {
-    let fb = Matrix::fb();
+impl TextScroller {
+    pub const fn new() -> Self {
+        Self { pos: 0, col: 0 }
+    }
 
-    for &c in text {
-        clock.next().await;
-        move_left(fb);
+    pub fn advance_clear(&mut self) -> bool {
+        self.advance_brightness(b"EE", 0)
+    }
 
-        for mut col in Letter::get(c).0 {
-            let downshift = match Letter::downshift(col) {
-                Some(n) => n,
-                None => break,
-            };
+    pub fn advance(&mut self, text: &[u8]) -> bool {
+        self.advance_brightness(text, TEXT_BRIGHTNESS)
+    }
 
-            clock.next().await;
-            move_left(fb);
+    // TODO: Two blank cols at end of string?
+    pub fn advance_brightness(&mut self, text: &[u8], brightness: u8) -> bool {
+        move_left();
 
-            for r in downshift..fb.0.len() {
-                let val = if col & 1 != 0 { brightness } else { 0 };
-                fb.0[r].last().unwrap().store(val, Ordering::Relaxed);
-                col >>= 1;
+        if let Some(&c) = text.get(self.pos) {
+            if let Some(&(mut col)) = Letter::get(c).0.get(self.col as usize)
+                && let Some(ds) = Letter::downshift(col)
+            {
+                for r in ds..Matrix::fb().0.len() {
+                    let val = if col & 1 != 0 { brightness } else { 0 };
+                    Matrix::fb().0[r].last().unwrap().store(val, Ordering::Relaxed);
+                    col >>= 1;
+                }
+                self.col += 1;
+            } else {
+                self.pos += 1;
+                self.col = 0;
             }
+        } else {
+            return true;
         }
+
+        false
     }
 }

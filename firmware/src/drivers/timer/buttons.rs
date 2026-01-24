@@ -1,5 +1,4 @@
 use core::{
-    future::poll_fn,
     sync::atomic::{AtomicBool, AtomicU8, Ordering},
     task::Poll,
 };
@@ -143,19 +142,17 @@ impl Buttons {
         BTN_STATE.get(btn).load(Ordering::Relaxed)
     }
 
-    pub fn event() -> impl Future<Output = Event> {
-        poll_fn(|_| {
-            let val = BTN_EVENT_SIGNAL.load(Ordering::Relaxed);
-            if val != 0 {
-                BTN_EVENT_SIGNAL.store(0, Ordering::Relaxed);
+    pub fn event() -> Poll<Event> {
+        let val = BTN_EVENT_SIGNAL.load(Ordering::Relaxed);
+        if val != 0 {
+            BTN_EVENT_SIGNAL.store(0, Ordering::Relaxed);
 
-                Poll::Ready(Event {
-                    button: Button::try_from(val as usize & ((1 << 2) - 1)).unwrap(),
-                    pressed: val & (1 << 2) != 0,
-                })
-            } else {
-                Poll::Pending
-            }
-        })
+            Poll::Ready(Event {
+                button: Button::try_from(val as usize & ((1 << 2) - 1)).unwrap(),
+                pressed: val & (1 << 2) != 0,
+            })
+        } else {
+            Poll::Pending
+        }
     }
 }

@@ -57,11 +57,17 @@ impl<'a> FilteredWs2812 {
         &mut self.target
     }
 
-    pub fn update(&mut self) -> impl Future {
-        for (current, desired) in self.output.iter_mut().zip(self.target.iter()) {
-            current.transition(desired);
+    pub fn try_update(&mut self) -> bool {
+        let ready = self.ws2812.ready();
+
+        if ready {
+            for (current, desired) in self.output.iter_mut().zip(self.target.iter()) {
+                current.transition(desired);
+            }
+
+            self.ws2812.try_write(&self.output);
         }
 
-        self.ws2812.write(&self.output)
+        ready
     }
 }

@@ -10,10 +10,8 @@ mod vectors;
 
 use qingke::{interrupt::Priority, pfic};
 use ch32_metapac::{self as pac, Interrupt, rcc::vals::Sw};
-use embassy_futures::block_on;
 use panic_halt as _;
 
-use crate::apps::{games, main};
 use crate::util::ws2812::FilteredWs2812;
 
 unsafe fn init_hsi_pll_48mhz() {
@@ -53,14 +51,13 @@ fn main() -> ! {
     unsafe { drivers::usb::init(); }
 
     let ws2812 = unsafe { drivers::ws2812::Ws2812::init() };
-    let mut filt_ws2812 = FilteredWs2812::new(ws2812);
+    let mut ws2812 = FilteredWs2812::new(ws2812);
 
     unsafe { drivers::timer_init(); }
 
-    block_on(async {
-        loop {
-            main::run(&mut filt_ws2812).await;
-            games::run(&mut filt_ws2812).await;
-        }
-    })
+    let mut main = apps::Main::new();
+
+    loop {
+        main.poll(&mut ws2812);
+    }
 }

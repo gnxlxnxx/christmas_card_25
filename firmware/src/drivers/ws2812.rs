@@ -1,6 +1,5 @@
 use core::sync::atomic::{Ordering, compiler_fence};
 
-use crate::util::sync::poll_while;
 use ch32_metapac::{self as pac, Interrupt};
 use qingke::pfic;
 
@@ -115,11 +114,15 @@ impl Ws2812 {
         Self { _private: () }
     }
 
-    pub async fn write(&mut self, colors: &[Color; LEDS]) {
+    pub fn ready(&self) -> bool {
+        pfic::is_pending(Interrupt::DMA1_CHANNEL3 as u8) && !pac::SPI1.statr().read().bsy()
+    }
+
+    pub fn try_write(&mut self, colors: &[Color; LEDS]) -> bool {
         // Wait for previous SPI to be done
-        poll_while(|| {
-            !pfic::is_pending(Interrupt::DMA1_CHANNEL3 as u8) || pac::SPI1.statr().read().bsy()
-        }).await;
+        if !self.ready() {
+            return false;
+        }
         unsafe { pfic::unpend_interrupt(Interrupt::DMA1_CHANNEL3 as u8); }
         compiler_fence(Ordering::Acquire);
 
@@ -149,5 +152,7 @@ impl Ws2812 {
             //w.set_pl(options.priority.into()); // priority
             w.set_en(true); // and start
         });
+
+        true
     }
 }

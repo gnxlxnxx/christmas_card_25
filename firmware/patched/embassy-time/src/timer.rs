@@ -172,6 +172,12 @@ impl Timer {
     pub fn after_secs(secs: u32) -> Self {
         Self::after(Duration::from_secs(secs))
     }
+
+    /// Check if the timer has expired
+    #[inline]
+    pub fn expired(&self) -> bool {
+        self.expires_at <= Instant::now()
+    }
 }
 
 impl Unpin for Timer {}
@@ -179,7 +185,7 @@ impl Unpin for Timer {}
 impl Future for Timer {
     type Output = ();
     fn poll(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if self.expires_at <= Instant::now() {
+        if self.expired() {
             Poll::Ready(())
         } else {
             Poll::Pending
@@ -242,11 +248,13 @@ impl Ticker {
     }
 
     /// Return the current duration value
+    #[inline]
     pub fn duration(&self) -> Duration {
         self.duration
     }
 
     /// Sets a new duration value
+    #[inline]
     pub fn set_duration(&mut self, val: Duration) {
         self.duration = val
     }
@@ -269,15 +277,36 @@ impl Ticker {
         self.expires_at = Instant::now() + after + self.duration;
     }
 
+    /// Checks if the next tick has been reached.
+    #[inline]
+    pub fn expired(&self) -> bool {
+        self.expires_at <= Instant::now()
+    }
+
+    /// Consumes the next tick.
+    #[inline]
+    pub fn consume_next(&mut self) {
+        self.expires_at += self.duration;
+    }
+
+    /// Consumes the next tick if it expired.
+    pub fn consume_expired(&mut self) -> bool {
+        let res = self.expired();
+
+        if res {
+            self.consume_next();
+        }
+
+        res
+    }
+
     /// Waits for the next tick.
     ///
     /// ## Cancel safety
     /// The produced Future is cancel safe, meaning no tick is lost if the Future is dropped.
     pub fn next(&mut self) -> impl Future<Output = ()> + Send + Sync + '_ {
         poll_fn(|_cx| {
-            if self.expires_at <= Instant::now() {
-                let dur = self.duration;
-                self.expires_at += dur;
+            if self.consume_expired() {
                 Poll::Ready(())
             } else {
                 Poll::Pending
@@ -291,9 +320,7 @@ impl Unpin for Ticker {}
 impl Stream for Ticker {
     type Item = ();
     fn poll_next(mut self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if self.expires_at <= Instant::now() {
-            let dur = self.duration;
-            self.expires_at += dur;
+        if self.consume_expired() {
             Poll::Ready(Some(()))
         } else {
             Poll::Pending

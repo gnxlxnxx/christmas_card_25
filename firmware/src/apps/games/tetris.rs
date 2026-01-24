@@ -1,7 +1,7 @@
 use crate::drivers::buttons::{Button, Buttons, Event};
 use crate::drivers::flash;
 use crate::drivers::matrix::{Framebuffer, Matrix};
-use crate::util::rand::WhiteNoiseGenerator;
+use crate::util::rand::Rng;
 use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
@@ -88,7 +88,7 @@ impl Piece {
 struct Tetris<'a> {
     board: [u8; Framebuffer::HEIGHT],
     current: Piece,
-    rng: WhiteNoiseGenerator,
+    rng: Rng,
     fb: &'a Framebuffer,
     score: u32,
 }
@@ -102,7 +102,7 @@ impl<'a> Tetris<'a> {
                 x: 0,
                 y: 0,
             },
-            rng: WhiteNoiseGenerator::new(),
+            rng: Rng::new(),
             fb: Matrix::fb(),
             score: 0,
         };

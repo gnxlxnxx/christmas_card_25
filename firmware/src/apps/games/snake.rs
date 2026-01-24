@@ -7,7 +7,7 @@ use crate::{
         flash,
         matrix::{self, Framebuffer, Matrix},
     },
-    util::rand::WhiteNoiseGenerator,
+    util::rand::Rng,
 };
 
 const HEAD_BRIGHTNESS: u8 = 64;
@@ -81,7 +81,7 @@ struct FbCoordinate {
 }
 
 impl FbCoordinate {
-    pub fn random(rng: &mut WhiteNoiseGenerator) -> Self {
+    pub fn random(rng: &mut Rng) -> Self {
         Self {
             x: rng.rand8() % Framebuffer::WIDTH as u8,
             y: rng.rand8() % Framebuffer::HEIGHT as u8,
@@ -146,7 +146,7 @@ impl<'a> Field<'a> {
         );
     }
 
-    pub fn gen_maultasch(&mut self, rng: &mut WhiteNoiseGenerator) {
+    pub fn gen_maultasch(&mut self, rng: &mut Rng) {
         loop {
             let pos = FbCoordinate::random(rng);
 
@@ -167,7 +167,7 @@ struct GameResult {
 
 #[derive(Debug)]
 struct Game<'a> {
-    rng: WhiteNoiseGenerator,
+    rng: Rng,
     field: Field<'a>,
     dir: Direction,
     dir_change: i32,
@@ -182,7 +182,7 @@ struct Game<'a> {
 impl<'a> Game<'a> {
     pub fn new(fb: &'a Framebuffer) -> Self {
         let mut g = Self {
-            rng: WhiteNoiseGenerator::new(),
+            rng: Rng::new(),
             field: Field::new(fb),
             dir: Direction::Right,
             dir_change: 0,
