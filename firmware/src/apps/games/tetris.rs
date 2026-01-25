@@ -246,7 +246,7 @@ impl<'a> Tetris<'a> {
 }
 
 enum TaskState {
-    Game(Ticker, Tetris<'static>),
+    Game(Ticker, Tetris<'static>, bool),
     Score(super::ShowScoreTask),
 }
 
@@ -254,22 +254,24 @@ pub struct Task(TaskState);
 
 impl Task {
     pub fn new() -> Self {
-        let game = Tetris::new();
-        game.draw();
-
-        Self(TaskState::Game(Ticker::every(Duration::from_millis(500)), game))
+        Self(TaskState::Game(Ticker::every(Duration::from_millis(500)), Tetris::new(), true))
     }
 
     pub fn poll(&mut self) -> bool {
         match &mut self.0 {
-            TaskState::Game(ticker, game) => {
+            TaskState::Game(ticker, game, redraw) => {
+                if *redraw {
+                    game.draw();
+                    *redraw = false;
+                }
+
                 if let Poll::Ready(Event {
                     pressed: true,
                     button,
                 }) = Buttons::event()
                 {
                     game.input(button);
-                    game.draw();
+                    *redraw = true;
                 }
 
                 if ticker.consume_expired() {
@@ -280,7 +282,7 @@ impl Task {
                             res.score,
                         ));
                     } else {
-                        game.draw();
+                        *redraw = true;
                     }
                 }
 
