@@ -1,8 +1,8 @@
+use core::task::Poll;
+
 use crate::drivers::buttons::{Button, Buttons, Event};
-use crate::drivers::flash;
 use crate::drivers::matrix::{Framebuffer, Matrix};
 use crate::util::rand::Rng;
-use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Ticker};
 
 const BOARD_BRIGHTNESS: u8 = 50;
@@ -107,7 +107,56 @@ impl<'a> Tetris<'a> {
             score: 0,
         };
         t.spawn();
+
         t
+    }
+
+    pub fn input(&mut self, but: Button) {
+        let mut p = self.current;
+
+        match but {
+            Button::L => {
+                p.x = p.x.wrapping_sub(1);
+            }
+            Button::R => {
+                p.x = p.x.wrapping_add(1);
+            }
+            Button::Select => {
+                p.rotate(true);
+            }
+            Button::Start => {
+                p.rotate(false);
+            }
+        }
+
+        if !self.collides(&p) {
+            self.current = p;
+        }
+    }
+
+    pub fn draw(&self) {
+        self.fb.clear_all();
+
+        for y in 0..HEIGHT {
+            for x in 0..WIDTH {
+                if self.board[y as usize] & (1 << x) != 0 {
+                    self.fb.store(x as usize, y as usize, BOARD_BRIGHTNESS);
+                }
+            }
+        }
+
+        let p = self.current;
+        for i in 0..16 {
+            if (p.shape >> i) & 1 == 0 {
+                continue;
+            }
+            let x = p.x.wrapping_add((i % 4) as u8);
+            let y = p.y.wrapping_add((i / 4) as u8);
+
+            if x < WIDTH && y < HEIGHT {
+                self.fb.store(x as usize, y as usize, PIECE_BRIGHTNESS);
+            }
+        }
     }
 
     fn spawn(&mut self) -> bool {
@@ -177,29 +226,6 @@ impl<'a> Tetris<'a> {
         self.score += cleared * cleared;
     }
 
-    pub fn input(&mut self, but: Button) {
-        let mut p = self.current;
-
-        match but {
-            Button::L => {
-                p.x = p.x.wrapping_sub(1);
-            }
-            Button::R => {
-                p.x = p.x.wrapping_add(1);
-            }
-            Button::Select => {
-                p.rotate(true);
-            }
-            Button::Start => {
-                p.rotate(false);
-            }
-        }
-
-        if !self.collides(&p) {
-            self.current = p;
-        }
-    }
-
     fn tick(&mut self) -> Option<GameResult> {
         let mut p = self.current;
         p.y = p.y.wrapping_add(1);
@@ -217,54 +243,50 @@ impl<'a> Tetris<'a> {
 
         None
     }
+}
 
-    pub fn draw(&mut self) {
-        self.fb.clear_all();
+enum TaskState {
+    Game(Ticker, Tetris<'static>),
+    Score(super::ShowScoreTask),
+}
 
-        for y in 0..HEIGHT {
-            for x in 0..WIDTH {
-                if self.board[y as usize] & (1 << x) != 0 {
-                    self.fb.store(x as usize, y as usize, BOARD_BRIGHTNESS);
+pub struct Task(TaskState);
+
+impl Task {
+    pub fn new() -> Self {
+        let game = Tetris::new();
+        game.draw();
+
+        Self(TaskState::Game(Ticker::every(Duration::from_millis(500)), game))
+    }
+
+    pub fn poll(&mut self) -> bool {
+        match &mut self.0 {
+            TaskState::Game(ticker, game) => {
+                if let Poll::Ready(Event { pressed: true, button }) = Buttons::event() {
+                    game.input(button);
+                    game.draw();
                 }
-            }
-        }
 
-        let p = self.current;
-        for i in 0..16 {
-            if (p.shape >> i) & 1 == 0 {
-                continue;
-            }
-            let x = p.x.wrapping_add((i % 4) as u8);
-            let y = p.y.wrapping_add((i / 4) as u8);
+                if ticker.consume_expired() {
+                    if let Some(res) = game.tick() {
+                        self.0 = TaskState::Score(
+                            super::ShowScoreTask::new(
+                                super::GameSelection::Tetris,
+                                false,
+                                res.score
+                            )
+                        );
+                    } else {
+                        game.draw();
+                    }
+                }
 
-            if x < WIDTH && y < HEIGHT {
-                self.fb.store(x as usize, y as usize, PIECE_BRIGHTNESS);
+                false
+            }
+            TaskState::Score(show_score_task) => {
+                show_score_task.poll()
             }
         }
     }
-}
-
-pub async fn run() {
-    let mut game = Tetris::new();
-    let mut ticker = Ticker::every(Duration::from_millis(500));
-
-    let res = loop {
-        let event = select(ticker.next(), Buttons::event()).await;
-
-        match event {
-            Either::First(_) => {
-                if let Some(res) = game.tick() {
-                    break res;
-                }
-            }
-            Either::Second(Event { pressed: true, button}) => game.input(button),
-            Either::Second(Event { pressed: false, button: _ }) => (),
-        }
-
-        game.draw();
-    };
-
-    let hs = flash::new_high_score(super::Game::Tetris.high_score_index(), res.score).await;
-
-    super::show_score(false, res.score, hs).await;
 }

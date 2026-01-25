@@ -1,15 +1,15 @@
-use embassy_futures::select::{Either, select};
+use core::task::Poll;
+
 use embassy_time::{Duration, Ticker};
 
 use crate::{
     drivers::{
-        buttons::{Button, Buttons, Event},
-        ws2812::Color,
+        buttons::{Button, Buttons, Event}, flash::ScoreFlasher, ws2812::Color
     },
     util::{
         itoa::utoa10,
         rand::Rng,
-        text::{self, TEXT_BRIGHTNESS, TEXT_DURATION},
+        text::{TEXT_BRIGHTNESS, TEXT_DURATION, TextScroller},
         ws2812::{FilteredWs2812, HUETABLE},
     },
 };
@@ -20,39 +20,95 @@ pub mod pong;
 pub mod snake;
 pub mod tetris;
 
-async fn show_score(has_won: bool, score: u32, high_score: u32) {
-    let mut clock = Ticker::every(TEXT_DURATION);
-    let scroll = if has_won {
-        text::scroll(b"Herzlichen Gl\x82ckwunsch!", 2 * TEXT_BRIGHTNESS, &mut clock)
-    } else {
-        text::scroll(b"Game Over!", TEXT_BRIGHTNESS, &mut clock)
-    };
-
-    select(wait_for_start_or_select(), scroll).await;
-
-    select(
-        wait_for_start_or_select(),
-        async {
-            let mut itoa_buf = [0u8; 10];
-
-            loop {
-                text::scroll(&HIGH_SCORE_TEXT[5..], TEXT_BRIGHTNESS, &mut clock).await;
-                text::scroll(utoa10(score, &mut itoa_buf), TEXT_BRIGHTNESS, &mut clock).await;
-                text::scroll(HIGH_SCORE_TEXT, TEXT_BRIGHTNESS, &mut clock).await;
-                text::scroll(utoa10(high_score, &mut itoa_buf), TEXT_BRIGHTNESS, &mut clock).await;
-            }
-        }
-    ).await;
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum ShowScoreTaskState {
+    Greeter,
+    ScoreText,
+    Score,
+    HighScoreText,
+    HighScore,
 }
 
-async fn wait_for_start_or_select() {
-    while !matches!(
-        Buttons::event().await,
-        Event {
-            button: Button::Start | Button::Select,
-            pressed: true
+struct ShowScoreTask {
+    ticker: Option<Ticker>,
+    scroller: TextScroller,
+    flasher: ScoreFlasher,
+    state: ShowScoreTaskState,
+    has_won: bool,
+    score: u32,
+    high_score: u32,
+}
+
+impl ShowScoreTask {
+    pub fn new(game: GameSelection, has_won: bool, score: u32) -> Self {
+        let (high_score, flasher) = ScoreFlasher::new(game.high_score_index(), score);
+
+        Self {
+            ticker: Some(Ticker::every(TEXT_DURATION)),
+            scroller: TextScroller::new(),
+            flasher,
+            state: ShowScoreTaskState::Greeter,
+            has_won,
+            score,
+            high_score,
         }
-    ) {}
+    }
+
+    pub fn poll(&mut self) -> bool {
+        if matches!(
+            Buttons::event(),
+            Poll::Ready(Event { button: Button::Start | Button::Select, pressed: true })
+        ) {
+            if self.state == ShowScoreTaskState::Greeter {
+                self.next_state();
+            } else {
+                self.ticker = None;
+            }
+        }
+
+        if self.ticker.as_mut().is_some_and(|t| t.consume_expired()) {
+            let mut itoa_buf = [0u8; 10];
+
+            if self.scroller.advance_brightness(self.text(&mut itoa_buf), self.brightness()) {
+                self.next_state();
+            }
+        }
+
+        self.flasher.poll() && self.ticker.is_none()
+    }
+
+    fn next_state(&mut self) {
+        self.scroller = TextScroller::new();
+        self.state = match self.state {
+            ShowScoreTaskState::Greeter => ShowScoreTaskState::ScoreText,
+            ShowScoreTaskState::ScoreText => ShowScoreTaskState::Score,
+            ShowScoreTaskState::Score => ShowScoreTaskState::HighScoreText,
+            ShowScoreTaskState::HighScoreText => ShowScoreTaskState::HighScore,
+            ShowScoreTaskState::HighScore => ShowScoreTaskState::ScoreText,
+        };
+    }
+
+    fn text<'a>(&self, itoa_buf: &'a mut [u8; 10]) -> &'a [u8] {
+        match self.state {
+            ShowScoreTaskState::Greeter => if self.has_won {
+                b"Herzlichen Gl\x82ckwunsch!".as_slice()
+            } else {
+                b"Game Over!".as_slice()
+            }
+            ShowScoreTaskState::ScoreText => &HIGH_SCORE_TEXT[5..],
+            ShowScoreTaskState::Score => utoa10(self.score, itoa_buf),
+            ShowScoreTaskState::HighScoreText => HIGH_SCORE_TEXT,
+            ShowScoreTaskState::HighScore => utoa10(self.high_score, itoa_buf),
+        }
+    }
+
+    fn brightness(&self) -> u8 {
+        if self.state == ShowScoreTaskState::Greeter && self.has_won {
+            2 * TEXT_BRIGHTNESS
+        } else {
+            TEXT_BRIGHTNESS
+        }
+    }
 }
 
 fn set_ws2812_led_random(led: &mut Color, enabled: bool, noisegen: &mut Rng) {
@@ -68,13 +124,14 @@ fn set_ws2812_led_random(led: &mut Color, enabled: bool, noisegen: &mut Rng) {
     }
 }
 
-enum Game {
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+enum GameSelection {
     Tetris,
     Snake,
     Pong,
 }
 
-impl Game {
+impl GameSelection {
     pub const fn new() -> Self {
         Self::Tetris
     }
@@ -110,58 +167,95 @@ impl Game {
             _ => panic!("No high score for this game"),
         }
     }
+}
 
-    pub async fn run(&self) {
+enum Game {
+    Tetris(tetris::Task),
+    Snake(snake::Task),
+    Pong(pong::Task),
+}
+
+impl Game {
+    pub fn from_selection(selection: GameSelection) -> Self {
+        match selection {
+            GameSelection::Tetris => Self::Tetris(tetris::Task::new()),
+            GameSelection::Snake => Self::Snake(snake::Task::new()),
+            GameSelection::Pong => Self::Pong(pong::Task::new()),
+        }
+    }
+
+    pub fn poll(&mut self) -> bool {
         match self {
-            Self::Tetris => tetris::run().await,
-            Self::Snake => snake::run().await,
-            Self::Pong => pong::run().await,
+            Self::Tetris(task) => task.poll(),
+            Self::Snake(task) => task.poll(),
+            Self::Pong(task) => task.poll(),
         }
     }
 }
 
-pub async fn run(filt_ws2812: &mut FilteredWs2812) {
-    let leds = filt_ws2812.target_mut();
-    leds[1] = Color::new(0, 0, 0);
-    leds[4] = Color::new(0, 0, 0);
+enum GameTask {
+    Selecting(GameSelection, Ticker, TextScroller),
+    Started(Game),
+}
 
-    select(
-        async {
-            let mut game = Game::new();
+impl GameTask {
+    pub fn new() -> Self {
+        Self::Selecting(GameSelection::new(), Ticker::every(TEXT_DURATION), TextScroller::new())
+    }
 
-            loop {
-                let mut clock = Ticker::every(TEXT_DURATION);
+    pub fn poll(&mut self) -> bool {
+        match self {
+            Self::Selecting(game, ticker, scroller) => {
+                if ticker.consume_expired() && scroller.advance(game.to_str()) {
+                    *scroller = TextScroller::new();
+                }
 
-                if let Either::First(Event { pressed: true, button }) = select(
-                    Buttons::event(),
-                    text::scroll(game.to_str(), TEXT_BRIGHTNESS, &mut clock),
-                ).await {
+                if let Poll::Ready(Event { pressed: true, button }) = Buttons::event() {
+                    *scroller = TextScroller::new();
                     match button {
-                        Button::Start => break,
+                        Button::Start => *self = Self::Started(Game::from_selection(*game)),
                         Button::Select => game.next(),
-                        Button::L => return,
+                        Button::L => return true,
                         Button::R => game.prev(),
                     }
                 }
+
+                false
             }
+            Self::Started(game) => game.poll(),
+        }
+    }
+}
 
-            game.run().await;
-        },
-        async {
-            let mut clock = Ticker::every(Duration::from_millis(10));
-            let mut noisegen = Rng::new();
+pub struct Task {
+    game: GameTask,
+    ws2812_ticker: Ticker,
+    rng: Rng,
+}
 
-            loop {
-                let leds = filt_ws2812.target_mut();
+impl Task {
+    pub fn new() -> Self {
+        Self {
+            game: GameTask::new(),
+            ws2812_ticker: Ticker::every(Duration::from_millis(10)),
+            rng: Rng::new(),
+        }
+    }
 
-                set_ws2812_led_random(&mut leds[0], Buttons::get(Button::L), &mut noisegen);
-                set_ws2812_led_random(&mut leds[2], Buttons::get(Button::Start), &mut noisegen);
-                set_ws2812_led_random(&mut leds[3], Buttons::get(Button::Select), &mut noisegen);
-                set_ws2812_led_random(&mut leds[5], Buttons::get(Button::R), &mut noisegen);
+    pub fn poll(&mut self, ws2812: &mut FilteredWs2812) -> bool {
+        if self.ws2812_ticker.expired() {
+            let leds = ws2812.target_mut();
 
-                filt_ws2812.update().await;
-                clock.next().await;
+            set_ws2812_led_random(&mut leds[0], Buttons::get(Button::L), &mut self.rng);
+            set_ws2812_led_random(&mut leds[2], Buttons::get(Button::Start), &mut self.rng);
+            set_ws2812_led_random(&mut leds[3], Buttons::get(Button::Select), &mut self.rng);
+            set_ws2812_led_random(&mut leds[5], Buttons::get(Button::R), &mut self.rng);
+
+            if ws2812.try_update() {
+                self.ws2812_ticker.consume_next();
             }
-        },
-    ).await;
+        }
+
+        self.game.poll()
+    }
 }

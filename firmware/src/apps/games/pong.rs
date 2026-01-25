@@ -1,6 +1,5 @@
-use core::sync::atomic::Ordering;
+use core::{sync::atomic::Ordering, task::Poll};
 
-use embassy_futures::select::{Either, select};
 use embassy_time::{Duration, Instant, Timer};
 
 use crate::drivers::{
@@ -183,61 +182,87 @@ impl Game {
         self.top.misses == Self::SCORE_MAX || self.bottom.misses == Self::SCORE_MAX
     }
 
-    pub fn draw_score(&self, fb: &Framebuffer, brightness: u8) {
+    pub fn draw_score(&self, brightness: u8) {
+        let fb = Matrix::fb();
         fb.clear_all();
         self.top.draw_score(fb, brightness);
         self.bottom.draw_score(fb, brightness);
     }
 
-    pub fn draw(&self, fb: &Framebuffer) {
-        self.draw_score(fb, SCORE_BRIGHTNESS);
+    pub fn draw(&self) {
+        let fb = Matrix::fb();
+        self.draw_score(SCORE_BRIGHTNESS);
         self.top.draw_paddle(fb);
         self.bottom.draw_paddle(fb);
         self.ball.draw(fb);
     }
 }
 
-pub async fn run() {
-    let mut g = Game::new();
-    let mut next_instant = Instant::now() + RESET_PAUSE_DURATION;
-    let mut duration = INITIAL_DURATION;
+enum TaskState {
+    Game(Game, Instant, Duration),
+    Score(Timer),
+}
 
-    loop {
-        g.draw(Matrix::fb());
+pub struct Task(TaskState);
 
-        match select(Buttons::event(), Timer::at(next_instant)).await {
-            Either::First(Event { pressed: true, button }) => match button {
-                Button::Start => g.top.move_paddle(-1),
-                Button::Select => g.top.move_paddle(1),
-                Button::L => g.bottom.move_paddle(-1),
-                Button::R => g.bottom.move_paddle(1),
-            },
-            Either::First(Event { pressed: false, button: _ }) => (),
-            Either::Second(()) => {
-                next_instant += match g.advance() {
-                    CollideResult::Missed => {
-                        if g.has_ended() {
-                            break;
-                        } else {
-                            duration = INITIAL_DURATION;
+impl Task {
+    pub fn new() -> Self {
+        let game = Game::new();
+        game.draw();
 
-                            RESET_PAUSE_DURATION
-                        }
+        Self(
+            TaskState::Game(
+                game,
+                Instant::now() + RESET_PAUSE_DURATION,
+                INITIAL_DURATION,
+            ),
+        )
+    }
+
+    pub fn poll(&mut self) -> bool {
+        match &mut self.0 {
+            TaskState::Game(game, next_instant, duration) => {
+                if let Poll::Ready(Event { pressed: true, button }) = Buttons::event() {
+                    match button {
+                        Button::Start => game.top.move_paddle(-1),
+                        Button::Select => game.top.move_paddle(1),
+                        Button::L => game.bottom.move_paddle(-1),
+                        Button::R => game.bottom.move_paddle(1),
                     }
-                    CollideResult::Hit => {
-                        let dur = duration.as_ticks();
-                        duration = Duration::from_ticks(((dur << 5) - dur) >> 5)
-                            .max(matrix::FRAME_DURATION);
-
-                        duration
-                    }
-                    CollideResult::None => duration,
+                    game.draw();
                 }
+
+                if *next_instant <= Instant::now() {
+                    *next_instant += match game.advance() {
+                        CollideResult::Missed => {
+                            if game.has_ended() {
+                                game.draw_score(END_SCORE_BRIGHTNESS);
+                                self.0 = TaskState::Score(Timer::after_secs(5));
+
+                                return false;
+                            } else {
+                                *duration = INITIAL_DURATION;
+
+                                RESET_PAUSE_DURATION
+                            }
+                        }
+                        CollideResult::Hit => {
+                            let dur = duration.as_ticks();
+                            *duration = Duration::from_ticks(((dur << 5) - dur) >> 5)
+                                .max(matrix::FRAME_DURATION);
+
+                            *duration
+                        }
+                        CollideResult::None => *duration,
+                    };
+                    game.draw();
+                }
+
+                false
+            }
+            TaskState::Score(timer) => {
+                timer.expired()
             }
         }
     }
-
-    g.draw_score(Matrix::fb(), END_SCORE_BRIGHTNESS);
-
-    Timer::after_secs(5).await;
 }

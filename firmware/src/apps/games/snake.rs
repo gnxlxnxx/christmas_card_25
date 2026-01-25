@@ -1,10 +1,10 @@
-use embassy_futures::select::{Either, select};
+use core::task::Poll;
+
 use embassy_time::{Duration, Ticker};
 
 use crate::{
     drivers::{
         buttons::{Button, Buttons, Event},
-        flash,
         matrix::{self, Framebuffer, Matrix},
     },
     util::rand::Rng,
@@ -270,52 +270,78 @@ impl<'a> Game<'a> {
     }
 }
 
-pub async fn run() {
-    let fb = Matrix::fb();
-    let mut clock = Ticker::every(INITIAL_DURATION);
-    let mut g = Game::new(fb);
-    let mut paused = false;
+enum TaskState {
+    Game { ticker: Ticker, game: Game<'static>, paused: bool },
+    Score(super::ShowScoreTask),
+}
 
-    let res = loop {
-        match select(Buttons::event(), clock.next()).await {
-            Either::First(Event { pressed: true, button }) => match button {
-                Button::Start => {
-                    clock.reset();
-                    paused ^= true;
-                }
-                Button::Select => {
-                    if paused {
-                        break GameResult { has_won: false, score: g.score };
-                    } else {
-                        let new_ticks = clock.duration().as_ticks() / 2;
-                        if new_ticks >= matrix::FRAME_DURATION.as_ticks() {
-                            g.multiplier <<= 1;
+pub struct Task(TaskState);
 
-                            clock.set_duration(Duration::from_ticks(new_ticks));
+impl Task {
+    pub fn new() -> Self {
+        Self(TaskState::Game {
+            ticker: Ticker::every(INITIAL_DURATION),
+            game: Game::new(Matrix::fb()),
+            paused: false,
+        })
+    }
+
+    pub fn poll(&mut self) -> bool {
+        match &mut self.0 {
+            TaskState::Game { ticker, game, paused } => {
+                if let Poll::Ready(Event { pressed: true, button }) = Buttons::event() {
+                    match button {
+                        Button::Start => {
+                            ticker.reset();
+                            *paused ^= true;
+                        }
+                        Button::Select => {
+                            if *paused {
+                                let score = game.score;
+                                self.switch_to_scoreboard(false, score);
+
+                                return false;
+                            } else {
+                                let new_ticks = ticker.duration().as_ticks() / 2;
+                                if new_ticks >= matrix::FRAME_DURATION.as_ticks() {
+                                    game.multiplier <<= 1;
+
+                                    ticker.set_duration(Duration::from_ticks(new_ticks));
+                                }
+                            }
+                        }
+                        Button::L => {
+                            if !*paused {
+                                game.turn_ccw();
+                            }
+                        }
+                        Button::R => {
+                            if !*paused {
+                                game.turn_cw();
+                            }
                         }
                     }
                 }
-                Button::L => {
-                    if !paused {
-                        g.turn_ccw();
-                    }
+
+                if !*paused && ticker.consume_expired() && let Some(res) = game.advance() {
+                    self.switch_to_scoreboard(res.has_won, res.score);
                 }
-                Button::R => {
-                    if !paused {
-                        g.turn_cw();
-                    }
-                }
-            },
-            Either::First(Event { pressed: false, button: _ }) => (),
-            Either::Second(()) => {
-                if !paused && let Some(r) = g.advance() {
-                    break r;
-                }
+
+                false
+            }
+            TaskState::Score(show_score_task) => {
+                show_score_task.poll()
             }
         }
-    };
+    }
 
-    let hs = flash::new_high_score(super::Game::Snake.high_score_index(), res.score).await;
-
-    super::show_score(res.has_won, res.score, hs).await;
+    fn switch_to_scoreboard(&mut self, has_won: bool, score: u32) {
+        self.0 = TaskState::Score(
+            super::ShowScoreTask::new(
+                super::GameSelection::Snake,
+                has_won,
+                score
+            )
+        );
+    }
 }

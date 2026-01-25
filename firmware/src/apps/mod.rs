@@ -1,11 +1,11 @@
 use crate::util::ws2812::FilteredWs2812;
 
-// pub mod games;
+pub mod games;
 pub mod animations;
 
 pub enum Main {
     Animations(animations::Task),
-    // Games(games::Task),
+    Games(games::Task),
 }
 
 impl Main {
@@ -17,15 +17,14 @@ impl Main {
         match self {
             Self::Animations(app) => {
                 if app.poll(ws2812) {
-                    // *self = Self::Games(games::Task::new());
+                    *self = Self::Games(games::Task::new());
+                }
+            }
+            Self::Games(app) => {
+                if app.poll(ws2812) {
                     *self = Self::Animations(animations::Task::new());
                 }
             }
-            // Self::Games(app) => {
-            //     if app.poll(ws2812) {
-            //         *self = Self::Animations(animations::Task::new());
-            //     }
-            // }
         }
     }
 }
