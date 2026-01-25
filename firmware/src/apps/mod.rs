@@ -1,7 +1,7 @@
 use crate::util::ws2812::FilteredWs2812;
 
-pub mod games;
 pub mod animations;
+pub mod games;
 
 pub enum Main {
     Animations(animations::Task),

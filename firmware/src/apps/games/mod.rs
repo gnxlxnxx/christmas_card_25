@@ -4,7 +4,9 @@ use embassy_time::{Duration, Ticker};
 
 use crate::{
     drivers::{
-        buttons::{Button, Buttons, Event}, flash::ScoreFlasher, ws2812::Color
+        buttons::{Button, Buttons, Event},
+        flash::ScoreFlasher,
+        ws2812::Color,
     },
     util::{
         itoa::utoa10,
@@ -57,7 +59,10 @@ impl ShowScoreTask {
     pub fn poll(&mut self) -> bool {
         if matches!(
             Buttons::event(),
-            Poll::Ready(Event { button: Button::Start | Button::Select, pressed: true })
+            Poll::Ready(Event {
+                button: Button::Start | Button::Select,
+                pressed: true
+            })
         ) {
             if self.state == ShowScoreTaskState::Greeter {
                 self.next_state();
@@ -90,10 +95,12 @@ impl ShowScoreTask {
 
     fn text<'a>(&self, itoa_buf: &'a mut [u8; 10]) -> &'a [u8] {
         match self.state {
-            ShowScoreTaskState::Greeter => if self.has_won {
-                b"Herzlichen Gl\x82ckwunsch!".as_slice()
-            } else {
-                b"Game Over!".as_slice()
+            ShowScoreTaskState::Greeter => {
+                if self.has_won {
+                    b"Herzlichen Gl\x82ckwunsch!".as_slice()
+                } else {
+                    b"Game Over!".as_slice()
+                }
             }
             ShowScoreTaskState::ScoreText => &HIGH_SCORE_TEXT[5..],
             ShowScoreTaskState::Score => utoa10(self.score, itoa_buf),
@@ -152,7 +159,7 @@ impl GameSelection {
         }
     }
 
-    pub const fn to_str(&self) -> &'static [u8] {
+    pub const fn to_str(self) -> &'static [u8] {
         match self {
             Self::Tetris => b" Tetris",
             Self::Snake => b" Snake",
@@ -200,7 +207,11 @@ enum GameTask {
 
 impl GameTask {
     pub fn new() -> Self {
-        Self::Selecting(GameSelection::new(), Ticker::every(TEXT_DURATION), TextScroller::new())
+        Self::Selecting(
+            GameSelection::new(),
+            Ticker::every(TEXT_DURATION),
+            TextScroller::new(),
+        )
     }
 
     pub fn poll(&mut self) -> bool {
@@ -210,7 +221,11 @@ impl GameTask {
                     *scroller = TextScroller::new();
                 }
 
-                if let Poll::Ready(Event { pressed: true, button }) = Buttons::event() {
+                if let Poll::Ready(Event {
+                    pressed: true,
+                    button,
+                }) = Buttons::event()
+                {
                     *scroller = TextScroller::new();
                     match button {
                         Button::Start => *self = Self::Started(Game::from_selection(*game)),

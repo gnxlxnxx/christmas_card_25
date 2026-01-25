@@ -263,20 +263,22 @@ impl Task {
     pub fn poll(&mut self) -> bool {
         match &mut self.0 {
             TaskState::Game(ticker, game) => {
-                if let Poll::Ready(Event { pressed: true, button }) = Buttons::event() {
+                if let Poll::Ready(Event {
+                    pressed: true,
+                    button,
+                }) = Buttons::event()
+                {
                     game.input(button);
                     game.draw();
                 }
 
                 if ticker.consume_expired() {
                     if let Some(res) = game.tick() {
-                        self.0 = TaskState::Score(
-                            super::ShowScoreTask::new(
-                                super::GameSelection::Tetris,
-                                false,
-                                res.score
-                            )
-                        );
+                        self.0 = TaskState::Score(super::ShowScoreTask::new(
+                            super::GameSelection::Tetris,
+                            false,
+                            res.score,
+                        ));
                     } else {
                         game.draw();
                     }
@@ -284,9 +286,7 @@ impl Task {
 
                 false
             }
-            TaskState::Score(show_score_task) => {
-                show_score_task.poll()
-            }
+            TaskState::Score(show_score_task) => show_score_task.poll(),
         }
     }
 }

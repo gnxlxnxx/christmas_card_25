@@ -165,7 +165,9 @@ impl Game {
     }
 
     pub fn advance(&mut self) -> CollideResult {
-        let res = self.top.collide_ball(&mut self.ball)
+        let res = self
+            .top
+            .collide_ball(&mut self.ball)
             .or(|| self.bottom.collide_ball(&mut self.ball));
 
         if res == CollideResult::Missed {
@@ -210,19 +212,21 @@ impl Task {
         let game = Game::new();
         game.draw();
 
-        Self(
-            TaskState::Game(
-                game,
-                Instant::now() + RESET_PAUSE_DURATION,
-                INITIAL_DURATION,
-            ),
-        )
+        Self(TaskState::Game(
+            game,
+            Instant::now() + RESET_PAUSE_DURATION,
+            INITIAL_DURATION,
+        ))
     }
 
     pub fn poll(&mut self) -> bool {
         match &mut self.0 {
             TaskState::Game(game, next_instant, duration) => {
-                if let Poll::Ready(Event { pressed: true, button }) = Buttons::event() {
+                if let Poll::Ready(Event {
+                    pressed: true,
+                    button,
+                }) = Buttons::event()
+                {
                     match button {
                         Button::Start => game.top.move_paddle(-1),
                         Button::Select => game.top.move_paddle(1),
@@ -260,9 +264,7 @@ impl Task {
 
                 false
             }
-            TaskState::Score(timer) => {
-                timer.expired()
-            }
+            TaskState::Score(timer) => timer.expired(),
         }
     }
 }

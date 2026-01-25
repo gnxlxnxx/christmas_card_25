@@ -1,4 +1,4 @@
-use core::{sync::atomic::{AtomicI32, Ordering}};
+use core::sync::atomic::{AtomicI32, Ordering};
 
 use embassy_time_driver::{Driver, time_driver_impl};
 

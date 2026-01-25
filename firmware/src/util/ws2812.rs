@@ -44,7 +44,7 @@ pub struct FilteredWs2812 {
     target: [Color; ws2812::LEDS],
 }
 
-impl<'a> FilteredWs2812 {
+impl FilteredWs2812 {
     pub fn new(ws2812: Ws2812) -> Self {
         Self {
             ws2812,

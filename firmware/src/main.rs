@@ -1,6 +1,7 @@
 #![no_std]
 #![no_main]
 #![feature(type_alias_impl_trait)]
+#![allow(clippy::new_without_default, clippy::missing_safety_doc)]
 
 pub mod apps;
 mod builtins;
@@ -8,9 +9,9 @@ pub mod drivers;
 pub mod util;
 mod vectors;
 
-use qingke::{interrupt::Priority, pfic};
 use ch32_metapac::{self as pac, Interrupt, rcc::vals::Sw};
 use panic_halt as _;
+use qingke::{interrupt::Priority, pfic};
 
 use crate::util::ws2812::FilteredWs2812;
 

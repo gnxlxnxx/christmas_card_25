@@ -4,7 +4,9 @@ mod time;
 
 use crate::drivers::timer::matrix::Matrix;
 use ch32_metapac::{
-    self as pac, Interrupt, gpio::vals::{Cnf, Mode}, timer::vals::{CcmrInputCcs, CcmrOutputCcs, Cms, Dir, FilterValue, Mms, Ocm, Urs}
+    self as pac, Interrupt,
+    gpio::vals::{Cnf, Mode},
+    timer::vals::{CcmrInputCcs, CcmrOutputCcs, Cms, Dir, FilterValue, Mms, Ocm, Urs},
 };
 use qingke::pfic;
 use qingke_rt::interrupt;

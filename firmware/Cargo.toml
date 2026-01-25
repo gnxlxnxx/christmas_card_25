@@ -14,8 +14,6 @@ ch32-metapac = { git = "https://github.com/ch32-rs/ch32-metapac", features = [
     "ch32v003f4u6"
 ]}
 
-embassy-futures = "0.1.2"
-embassy-sync = "0.7.2"
 embassy-time = "0.5.0"
 embassy-time-driver = { version = "0.2.1", features = [ "tick-hz-10_000" ] }
 

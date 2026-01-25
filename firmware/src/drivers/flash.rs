@@ -19,7 +19,7 @@ pub enum ScoreFlasher {
 }
 
 impl ScoreFlasher {
-    pub fn new(id:usize, score: u32) -> (u32, Self) {
+    pub fn new(id: usize, score: u32) -> (u32, Self) {
         let mut scores = unsafe { HIGH_SCORES_PTR.read_volatile() };
 
         // Restore erased flash to sane value

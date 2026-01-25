@@ -271,7 +271,11 @@ impl<'a> Game<'a> {
 }
 
 enum TaskState {
-    Game { ticker: Ticker, game: Game<'static>, paused: bool },
+    Game {
+        ticker: Ticker,
+        game: Game<'static>,
+        paused: bool,
+    },
     Score(super::ShowScoreTask),
 }
 
@@ -289,7 +293,11 @@ impl Task {
     pub fn poll(&mut self) -> bool {
         match &mut self.0 {
             TaskState::Game { ticker, game, paused } => {
-                if let Poll::Ready(Event { pressed: true, button }) = Buttons::event() {
+                if let Poll::Ready(Event {
+                    pressed: true,
+                    button,
+                }) = Buttons::event()
+                {
                     match button {
                         Button::Start => {
                             ticker.reset();
@@ -323,25 +331,24 @@ impl Task {
                     }
                 }
 
-                if !*paused && ticker.consume_expired() && let Some(res) = game.advance() {
+                if !*paused
+                    && ticker.consume_expired()
+                    && let Some(res) = game.advance()
+                {
                     self.switch_to_scoreboard(res.has_won, res.score);
                 }
 
                 false
             }
-            TaskState::Score(show_score_task) => {
-                show_score_task.poll()
-            }
+            TaskState::Score(show_score_task) => show_score_task.poll(),
         }
     }
 
     fn switch_to_scoreboard(&mut self, has_won: bool, score: u32) {
-        self.0 = TaskState::Score(
-            super::ShowScoreTask::new(
-                super::GameSelection::Snake,
-                has_won,
-                score
-            )
-        );
+        self.0 = TaskState::Score(super::ShowScoreTask::new(
+            super::GameSelection::Snake,
+            has_won,
+            score,
+        ));
     }
 }

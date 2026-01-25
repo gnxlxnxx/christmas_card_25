@@ -28,7 +28,11 @@ impl Task {
     }
 
     pub fn poll(&mut self, ws2812: &mut FilteredWs2812) -> bool {
-        if let Poll::Ready(Event { pressed: true, button }) = Buttons::event() {
+        if let Poll::Ready(Event {
+            pressed: true,
+            button,
+        }) = Buttons::event()
+        {
             match button {
                 Button::Start => return true,
                 Button::Select => {

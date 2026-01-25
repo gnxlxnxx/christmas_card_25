@@ -3,7 +3,10 @@ use core::{
     sync::atomic::{AtomicU8, Ordering},
 };
 
-use ch32_metapac::{self as pac, gpio::vals::{Cnf, Mode}};
+use ch32_metapac::{
+    self as pac,
+    gpio::vals::{Cnf, Mode},
+};
 use embassy_time::Duration;
 
 // from itertools import batched
@@ -62,15 +65,15 @@ const GAMMA_LUT: [[u8; 3]; 128] = [
 // ];
 
 const PINS: [(u8, u8); ROWS] = [
-        (3, 0),
-        (0, 2),
-        (0, 1),
-        (3, 6),
-        (3, 5),
-        (3, 2),
-        (2, 7),
-        (2, 4),
-        (2, 1),
+    (3, 0),
+    (0, 2),
+    (0, 1),
+    (3, 6),
+    (3, 5),
+    (3, 2),
+    (2, 7),
+    (2, 4),
+    (2, 1),
 ];
 
 pub const FRAME_DURATION: Duration = Duration::from_ticks(2 * Framebuffer::HEIGHT as u32);

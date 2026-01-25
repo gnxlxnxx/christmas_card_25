@@ -1,10 +1,13 @@
 pub mod descriptors;
-pub mod usb;
+pub mod rv003usb;
 use crate::drivers::buttons::{Button, Buttons};
-use ch32_metapac::{self as pac, Interrupt, gpio::vals::{Cnf, Mode}};
+use ch32_metapac::{
+    self as pac, Interrupt,
+    gpio::vals::{Cnf, Mode},
+};
 use qingke::pfic;
 use qingke_rt::interrupt;
-use usb::UsbIf;
+use rv003usb::UsbIf;
 
 const USB_PORT: usize = 2;
 const USB_DP_PIN: usize = 3;
