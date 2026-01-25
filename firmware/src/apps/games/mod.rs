@@ -18,6 +18,7 @@ use crate::{
 
 const HIGH_SCORE_TEXT: &[u8] = b" High Score: ";
 
+pub mod four_in_a_row;
 pub mod pong;
 pub mod snake;
 pub mod tetris;
@@ -136,6 +137,7 @@ enum GameSelection {
     Tetris,
     Snake,
     Pong,
+    FourInARow,
 }
 
 impl GameSelection {
@@ -147,7 +149,8 @@ impl GameSelection {
         *self = match self {
             Self::Tetris => Self::Snake,
             Self::Snake => Self::Pong,
-            Self::Pong => Self::Tetris,
+            Self::Pong => Self::FourInARow,
+            Self::FourInARow => Self::Tetris,
         }
     }
 
@@ -155,7 +158,8 @@ impl GameSelection {
         *self = match self {
             Self::Snake => Self::Tetris,
             Self::Pong => Self::Snake,
-            Self::Tetris => Self::Pong,
+            Self::FourInARow => Self::Pong,
+            Self::Tetris => Self::FourInARow,
         }
     }
 
@@ -164,6 +168,7 @@ impl GameSelection {
             Self::Tetris => b" Tetris",
             Self::Snake => b" Snake",
             Self::Pong => b" Pong",
+            Self::FourInARow => b" Four In A Row",
         }
     }
 
@@ -180,6 +185,7 @@ enum Game {
     Tetris(tetris::Task),
     Snake(snake::Task),
     Pong(pong::Task),
+    FourInARow(four_in_a_row::Task),
 }
 
 impl Game {
@@ -188,6 +194,7 @@ impl Game {
             GameSelection::Tetris => Self::Tetris(tetris::Task::new()),
             GameSelection::Snake => Self::Snake(snake::Task::new()),
             GameSelection::Pong => Self::Pong(pong::Task::new()),
+            GameSelection::FourInARow => Self::FourInARow(four_in_a_row::Task::new()),
         }
     }
 
@@ -196,6 +203,7 @@ impl Game {
             Self::Tetris(task) => task.poll(),
             Self::Snake(task) => task.poll(),
             Self::Pong(task) => task.poll(),
+            Self::FourInARow(task) => task.poll(),
         }
     }
 }
