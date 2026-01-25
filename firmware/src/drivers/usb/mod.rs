@@ -19,17 +19,24 @@ const USB_DPU_PIN: usize = 5;
 static mut USB_IF: UsbIf<0x4001_1000usize, USB_DP_PIN, USB_DM_PIN, 3> = UsbIf::new(
     |_e, _scratchpad, endp, sendtok, usbif| {
         if endp == 1 {
-            let mut tsajoystick_keyboard: [u8; 8] = [0x00; 8];
-            let mut nextkc = tsajoystick_keyboard.iter_mut().skip(2);
+            let mut tsajoystick_keyboard = [0u8; 8];
+            let mut nextkc = 2;
+
             // Keyboard (8 bytes)
             if Buttons::get(Button::R) {
-                *nextkc.next().unwrap() = 0x4f; // Right
+                tsajoystick_keyboard[nextkc] = 0x4f; // Right
+                nextkc += 1;
             }
             if Buttons::get(Button::L) {
-                *nextkc.next().unwrap() = 0x50; // Left
+                tsajoystick_keyboard[nextkc] = 0x50; // Left
             }
             unsafe {
-                usbif.usb_send_data(tsajoystick_keyboard.as_ptr(), 8, 0, sendtok);
+                usbif.usb_send_data(
+                    tsajoystick_keyboard.as_ptr(),
+                    tsajoystick_keyboard.len() as u32,
+                    0,
+                    sendtok,
+                );
             }
         } else {
             // If it's a control transfer, empty it.
