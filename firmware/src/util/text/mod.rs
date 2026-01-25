@@ -51,7 +51,6 @@ impl TextScroller {
         self.advance_brightness(text, TEXT_BRIGHTNESS)
     }
 
-    // TODO: Two blank cols at end of string?
     pub fn advance_brightness(&mut self, text: &[u8], brightness: u8) -> bool {
         move_left();
 
@@ -69,10 +68,8 @@ impl TextScroller {
                 self.pos += 1;
                 self.col = 0;
             }
-        } else {
-            return true;
         }
 
-        false
+        self.pos >= text.len()
     }
 }

@@ -234,7 +234,11 @@ pub struct Task {
 }
 
 impl Task {
-    pub fn new() -> Self {
+    pub fn new(ws2812: &mut FilteredWs2812) -> Self {
+        let leds = ws2812.target_mut();
+        leds[1] = Color::new(0, 0, 0);
+        leds[4] = Color::new(0, 0, 0);
+
         Self {
             game: GameTask::new(),
             ws2812_ticker: Ticker::every(Duration::from_millis(10)),

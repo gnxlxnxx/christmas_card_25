@@ -17,7 +17,7 @@ impl Main {
         match self {
             Self::Animations(app) => {
                 if app.poll(ws2812) {
-                    *self = Self::Games(games::Task::new());
+                    *self = Self::Games(games::Task::new(ws2812));
                 }
             }
             Self::Games(app) => {
