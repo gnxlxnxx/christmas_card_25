@@ -1,3 +1,4 @@
+use core::sync::atomic::Ordering;
 use core::task::Poll;
 
 use crate::drivers::buttons::{Button, Buttons, Event};
@@ -154,7 +155,7 @@ impl<'a> Tetris<'a> {
             let y = p.y.wrapping_add((i / 4) as u8);
 
             if x < WIDTH && y < HEIGHT {
-                self.fb.store(x as usize, y as usize, PIECE_BRIGHTNESS);
+                self.fb.0[y as usize][x as usize].store(PIECE_BRIGHTNESS, Ordering::Relaxed);
             }
         }
     }
