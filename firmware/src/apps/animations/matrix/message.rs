@@ -11,6 +11,7 @@ pub struct Task {
 }
 
 impl Task {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             ticker: Ticker::every(TEXT_DURATION),

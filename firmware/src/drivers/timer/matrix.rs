@@ -79,14 +79,17 @@ impl Framebuffer {
     pub const WIDTH: usize = (ROWS - 1);
     pub const HEIGHT: usize = ROWS;
 
+    #[must_use]
     pub const fn new() -> Self {
         Self::new_filled(0)
     }
 
+    #[must_use]
     pub const fn new_filled(val: u8) -> Self {
         Self::from_u8_array([[val; Self::WIDTH]; Self::HEIGHT])
     }
 
+    #[must_use]
     pub const fn from_u8_array(arr: [[u8; Self::WIDTH]; Self::HEIGHT]) -> Self {
         Self(unsafe { mem::transmute::<[[u8; 8]; 9], [[AtomicU8; 8]; 9]>(arr) })
     }
@@ -100,7 +103,7 @@ impl Framebuffer {
     }
 
     pub fn store(&self, x: usize, y: usize, val: u8) {
-        self.0[y][x].store(val, Ordering::Relaxed)
+        self.0[y][x].store(val, Ordering::Relaxed);
     }
 
     pub fn set_all(&self, val: u8) {
@@ -205,6 +208,7 @@ impl Pins {
 pub struct Matrix;
 
 impl Matrix {
+    #[must_use]
     pub fn fb() -> &'static Framebuffer {
         &FB
     }

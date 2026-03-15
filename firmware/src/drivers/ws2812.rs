@@ -31,18 +31,22 @@ static mut SPI_DMA_BUF: [[u16; 6]; LEDS + 3] = [[0; 6]; LEDS + 3];
 pub struct Color([u8; 3]);
 
 impl Color {
+    #[must_use]
     pub fn new(r: u8, g: u8, b: u8) -> Self {
         Self([g, r, b])
     }
 
+    #[must_use]
     pub fn r(&self) -> u8 {
         self.0[1]
     }
 
+    #[must_use]
     pub fn g(&self) -> u8 {
         self.0[0]
     }
 
+    #[must_use]
     pub fn b(&self) -> u8 {
         self.0[2]
     }
@@ -82,6 +86,7 @@ pub struct Ws2812 {
 }
 
 impl Ws2812 {
+    #[must_use]
     pub unsafe fn init() -> Self {
         // Remap is implicitly set as 0
         pac::GPIOC.cfglr().modify(|w| {
@@ -114,6 +119,7 @@ impl Ws2812 {
         Self { _private: () }
     }
 
+    #[must_use]
     pub fn ready(&self) -> bool {
         pfic::is_pending(Interrupt::DMA1_CHANNEL3 as u8) && !pac::SPI1.statr().read().bsy()
     }
@@ -136,7 +142,7 @@ impl Ws2812 {
         let tx_dst = pac::SPI1.datar().as_ptr();
         let ch = pac::DMA1.ch(3 - 1);
         ch.par().write_value(tx_dst as u32); // PADDR
-        ch.mar().write_value(spi_dma_buf.as_flattened() as *const _ as *const u16 as u32); // MADDR
+        ch.mar().write_value(spi_dma_buf.as_flattened().as_ptr() as u32); // MADDR
         ch.ndtr().write(|w| w.set_ndt(spi_dma_buf.as_flattened().len() as u16)); // CNTR
 
         compiler_fence(Ordering::Release);

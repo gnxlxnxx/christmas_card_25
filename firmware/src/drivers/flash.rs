@@ -70,7 +70,8 @@ impl ScoreFlasher {
                     while FLASH.statr().read().bsy() {}
                     for i in 0..16 {
                         unsafe {
-                            (HIGH_SCORES_PTR as *mut u32)
+                            HIGH_SCORES_PTR
+                                .cast::<u32>()
                                 .add(i)
                                 .write_volatile(scores.get(i).copied().unwrap_or(0));
                         }

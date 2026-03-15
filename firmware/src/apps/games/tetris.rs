@@ -41,32 +41,6 @@ struct Piece {
 }
 
 impl Piece {
-    fn _bounds(&self) -> ((u8, u8), (u8, u8)) {
-        let mut min_x = 4;
-        let mut max_x = 0;
-        let mut min_y = 4;
-        let mut max_y = 0;
-        for i in 0..16 {
-            if (self.shape >> i) & 1 == 1 {
-                let x = (i % 4) as u8;
-                let y = (i / 4) as u8;
-                if x < min_x {
-                    min_x = x;
-                }
-                if x > max_x {
-                    max_x = x;
-                }
-                if y < min_y {
-                    min_y = y;
-                }
-                if y > max_y {
-                    max_y = y;
-                }
-            }
-        }
-        ((min_x, max_x), (min_y, max_y))
-    }
-
     fn rotate(&mut self, cw: bool) {
         let mut out = 0;
         for i in 0..16 {
@@ -94,7 +68,7 @@ struct Tetris<'a> {
     score: u32,
 }
 
-impl<'a> Tetris<'a> {
+impl Tetris<'_> {
     pub fn new() -> Self {
         let mut t = Self {
             board: [0; Framebuffer::HEIGHT],
@@ -180,7 +154,7 @@ impl<'a> Tetris<'a> {
             let px = p.x.wrapping_add((i as u8) % 4);
             let py = p.y.wrapping_add((i as u8) / 4);
 
-            if (py as i8) < 0 {
+            if py.cast_signed() < 0 {
                 continue;
             }
 
@@ -254,8 +228,13 @@ enum TaskState {
 pub struct Task(TaskState);
 
 impl Task {
+    #[must_use]
     pub fn new() -> Self {
-        Self(TaskState::Game(Ticker::every(Duration::from_millis(500)), Tetris::new(), true))
+        Self(TaskState::Game(
+            Ticker::every(Duration::from_millis(500)),
+            Tetris::new(),
+            true,
+        ))
     }
 
     pub fn poll(&mut self) -> bool {

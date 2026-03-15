@@ -208,6 +208,7 @@ enum TaskState {
 pub struct Task(TaskState);
 
 impl Task {
+    #[must_use]
     pub fn new() -> Self {
         let game = Game::new();
         game.draw();
@@ -244,11 +245,11 @@ impl Task {
                                 self.0 = TaskState::Score(Timer::after_secs(5));
 
                                 return false;
-                            } else {
-                                *duration = INITIAL_DURATION;
-
-                                RESET_PAUSE_DURATION
                             }
+
+                            *duration = INITIAL_DURATION;
+
+                            RESET_PAUSE_DURATION
                         }
                         CollideResult::Hit => {
                             let dur = duration.as_ticks();

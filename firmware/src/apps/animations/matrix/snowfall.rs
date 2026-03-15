@@ -10,6 +10,7 @@ pub struct Task {
 }
 
 impl Task {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             advance_ticker: Ticker::every(Duration::from_millis(256)),

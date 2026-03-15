@@ -11,6 +11,7 @@ pub struct Task {
 }
 
 impl Task {
+    #[must_use]
     pub fn new() -> Self {
         let mut task = Self {
             progress_ticker: Ticker::every(Duration::from_millis(100)),

@@ -19,6 +19,7 @@ pub struct Task {
 }
 
 impl Task {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             matrix: matrix::Task::new(),

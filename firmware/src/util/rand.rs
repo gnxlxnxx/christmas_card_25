@@ -12,6 +12,7 @@ static LFSR: AtomicU32 = AtomicU32::new(1);
 pub struct Rng;
 
 impl Rng {
+    #[must_use]
     pub fn new() -> Self {
         Self
     }

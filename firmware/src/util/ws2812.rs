@@ -45,6 +45,7 @@ pub struct FilteredWs2812 {
 }
 
 impl FilteredWs2812 {
+    #[must_use]
     pub fn new(ws2812: Ws2812) -> Self {
         Self {
             ws2812,

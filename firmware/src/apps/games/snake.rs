@@ -28,7 +28,7 @@ enum Direction {
 }
 
 impl Direction {
-    pub fn cw(&self) -> Self {
+    pub fn cw(self) -> Self {
         match self {
             Self::Up => Self::Right,
             Self::Right => Self::Down,
@@ -37,7 +37,7 @@ impl Direction {
         }
     }
 
-    pub fn ccw(&self) -> Self {
+    pub fn ccw(self) -> Self {
         match self {
             Self::Left => Self::Down,
             Self::Down => Self::Right,
@@ -46,7 +46,7 @@ impl Direction {
         }
     }
 
-    pub fn delta(&self) -> (i32, i32) {
+    pub fn delta(self) -> (i32, i32) {
         match self {
             Self::Up => (0, -1),
             Self::Right => (1, 0),
@@ -88,7 +88,7 @@ impl FbCoordinate {
         }
     }
 
-    pub fn go_dir(&self, dir: Direction) -> Self {
+    pub fn go_dir(self, dir: Direction) -> Self {
         let x = self.x as i32;
         let y = self.y as i32;
         let (dx, dy) = dir.delta();
@@ -99,7 +99,7 @@ impl FbCoordinate {
         }
     }
 
-    pub fn set_fb(&self, fb: &Framebuffer, val: u8) {
+    pub fn set_fb(self, fb: &Framebuffer, val: u8) {
         fb.store(self.x as usize, self.y as usize, val);
     }
 
@@ -282,6 +282,7 @@ enum TaskState {
 pub struct Task(TaskState);
 
 impl Task {
+    #[must_use]
     pub fn new() -> Self {
         Self(TaskState::Game {
             ticker: Ticker::every(INITIAL_DURATION),
@@ -309,13 +310,13 @@ impl Task {
                                 self.switch_to_scoreboard(false, score);
 
                                 return false;
-                            } else {
-                                let new_ticks = ticker.duration().as_ticks() / 2;
-                                if new_ticks >= matrix::FRAME_DURATION.as_ticks() {
-                                    game.multiplier <<= 1;
+                            }
 
-                                    ticker.set_duration(Duration::from_ticks(new_ticks));
-                                }
+                            let new_ticks = ticker.duration().as_ticks() / 2;
+                            if new_ticks >= matrix::FRAME_DURATION.as_ticks() {
+                                game.multiplier <<= 1;
+
+                                ticker.set_duration(Duration::from_ticks(new_ticks));
                             }
                         }
                         Button::L => {

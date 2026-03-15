@@ -172,7 +172,7 @@ impl GameSelection {
         }
     }
 
-    pub const fn high_score_index(&self) -> usize {
+    pub const fn high_score_index(self) -> usize {
         match self {
             Self::Tetris => 0,
             Self::Snake => 1,

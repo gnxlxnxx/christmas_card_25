@@ -18,7 +18,7 @@ const _: () = {
 };
 
 fn move_left() {
-    for row in Matrix::fb().0.iter() {
+    for row in &Matrix::fb().0 {
         let len = row.len();
         if len == 0 {
             continue;
@@ -39,6 +39,7 @@ pub struct TextScroller {
 }
 
 impl TextScroller {
+    #[must_use]
     pub const fn new() -> Self {
         Self { pos: 0, col: 0 }
     }

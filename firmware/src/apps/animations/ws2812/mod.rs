@@ -11,6 +11,7 @@ pub enum Task {
 }
 
 impl Task {
+    #[must_use]
     pub fn new() -> Self {
         Self::Fire(fire::Task::new())
     }

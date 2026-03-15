@@ -41,7 +41,7 @@ fn main() -> ! {
         w.set_afioen(true);
     });
     pac::RCC.apb1pcenr().write(|w| {
-        w.set_tim2en(true)
+        w.set_tim2en(true);
     });
 
     unsafe {

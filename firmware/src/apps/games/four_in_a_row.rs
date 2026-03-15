@@ -1,8 +1,14 @@
-use core::{sync::atomic::{AtomicU8, Ordering}, task::Poll};
+use core::{
+    sync::atomic::{AtomicU8, Ordering},
+    task::Poll,
+};
 
 use embassy_time::{Duration, Instant, Ticker};
 
-use crate::{drivers::{buttons::{Button, Buttons, Event}, matrix::{Framebuffer, Matrix}}};
+use crate::drivers::{
+    buttons::{Button, Buttons, Event},
+    matrix::{Framebuffer, Matrix},
+};
 
 const P1_BRIGHTNESS: u8 = 100;
 const P2_BRIGHTNESS: u8 = P1_BRIGHTNESS / 3;
@@ -20,9 +26,8 @@ const SELECTED_Y: usize = BASE_Y - SELECTED_DELTA as usize;
 // STEPS = 8
 // MAX = 255 / (sqrt(2) - 1) # = sqrt(2 * DELTA_S / A)
 // print('    ' + ' '.join((f'{round(MAX * (sqrt(i+1) - sqrt(i)))},' for i in range(STEPS))))
-const DROP_DURATIONS: [u8; (HEIGHT + SELECTED_DELTA - 1) as usize] = [
-    255, 196, 165, 145, 131, 121, 112,
-];
+const DROP_DURATIONS: [u8; (HEIGHT + SELECTED_DELTA - 1) as usize] =
+    [255, 196, 165, 145, 131, 121, 112];
 
 const _: () = {
     assert!((WIDTH + 1) as usize <= Framebuffer::WIDTH);
@@ -91,7 +96,9 @@ impl WinAnimation {
     }
     pub fn poll(&mut self) {
         if self.ticker.consume_expired() {
-            let brightness = if Matrix::fb().load(self.x as usize, self.y as usize) == self.original_brightness {
+            let brightness = if Matrix::fb().load(self.x as usize, self.y as usize)
+                == self.original_brightness
+            {
                 WIN_BRIGHTNESS
             } else {
                 self.original_brightness
@@ -99,9 +106,9 @@ impl WinAnimation {
 
             for i in 0..4 {
                 Matrix::fb().store(
-                    (self.x as usize).wrapping_sub_signed(i * self.dx as isize) as usize,
-                    (self.y as usize).wrapping_sub_signed(i * self.dy as isize) as usize,
-                    brightness
+                    (self.x as usize).wrapping_sub_signed(i * self.dx as isize),
+                    (self.y as usize).wrapping_sub_signed(i * self.dy as isize),
+                    brightness,
                 );
             }
         }
@@ -183,7 +190,7 @@ impl Game {
         self.clear_selected();
 
         loop {
-            if self.selected <= 0 {
+            if self.selected == 0 {
                 self.selected = WIDTH - 1;
             } else {
                 self.selected -= 1;
@@ -197,7 +204,7 @@ impl Game {
         self.draw_selected();
     }
 
-    fn move_right_test(&mut self)  -> bool {
+    fn move_right_test(&mut self) -> bool {
         let selected_start = self.selected;
 
         self.clear_selected();
@@ -208,7 +215,6 @@ impl Game {
             } else {
                 self.selected += 1;
             }
-
 
             if self.top_y[self.selected as usize] > 0 {
                 break;
@@ -239,7 +245,7 @@ impl Game {
 
     fn check_win(&self) -> Option<WinAnimation> {
         let x = self.selected as usize;
-        let y = self.top_y[x as usize] as usize;
+        let y = self.top_y[x] as usize;
         let p_brightness = self.current_player_brightness();
 
         for (dx, dy) in [(1i8, 0i8), (0, 1), (1, 1), (-1, 1)] {
@@ -252,11 +258,13 @@ impl Game {
                 1 => x,
                 _ => unreachable!(),
             };
-            let back = back.min(match dy {
-                0 => usize::MAX,
-                1 => y,
-                _ => unreachable!(),
-            }) as isize;
+            let back = back
+                .min(match dy {
+                    0 => usize::MAX,
+                    1 => y,
+                    _ => unreachable!(),
+                })
+                .cast_signed();
             let start_x = x.wrapping_sub_signed(dx * back);
             let start_y = y.wrapping_sub_signed(dy * back);
             let len = match dx {
@@ -265,11 +273,13 @@ impl Game {
                 1 => WIDTH as usize - start_x,
                 _ => unreachable!(),
             };
-            let len = len.min(match dy {
-                0 => usize::MAX,
-                1 => HEIGHT as usize - start_y,
-                _ => unreachable!(),
-            }) as isize;
+            let len = len
+                .min(match dy {
+                    0 => usize::MAX,
+                    1 => HEIGHT as usize - start_y,
+                    _ => unreachable!(),
+                })
+                .cast_signed();
 
             let start_y = start_y + BASE_Y;
 
@@ -282,7 +292,13 @@ impl Game {
                 if Matrix::fb().0[y][x].load(Ordering::Relaxed) == p_brightness {
                     consecutive += 1;
                     if consecutive >= 4 {
-                        return Some(WinAnimation::new(x as u8, y as u8, dx as i8, dy as i8, p_brightness));
+                        return Some(WinAnimation::new(
+                            x as u8,
+                            y as u8,
+                            dx as i8,
+                            dy as i8,
+                            p_brightness,
+                        ));
                     }
                 } else {
                     consecutive = 0;
@@ -299,10 +315,8 @@ impl Game {
     }
 
     fn draw_selected(&self) {
-        Matrix::fb().0[SELECTED_Y][self.selected as usize].store(
-            self.current_player_brightness(),
-            Ordering::Relaxed,
-        );
+        Matrix::fb().0[SELECTED_Y][self.selected as usize]
+            .store(self.current_player_brightness(), Ordering::Relaxed);
     }
 
     fn current_player_brightness(&self) -> u8 {
@@ -325,6 +339,7 @@ pub struct Task {
 }
 
 impl Task {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             state: TaskState::Game(Game::new(), None),
@@ -346,13 +361,11 @@ impl Task {
                             self.state = TaskState::Score(res);
                         }
                     }
-                } else {
-                    if let Poll::Ready(Event { pressed: true, button }) = Buttons::event() {
-                        match button {
-                            Button::Start | Button::Select => *drop_animation = Some(game.drop()),
-                            Button::L => game.move_left(),
-                            Button::R => game.move_right(),
-                        }
+                } else if let Poll::Ready(Event { pressed: true, button }) = Buttons::event() {
+                    match button {
+                        Button::Start | Button::Select => *drop_animation = Some(game.drop()),
+                        Button::L => game.move_left(),
+                        Button::R => game.move_right(),
                     }
                 }
             }

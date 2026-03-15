@@ -100,7 +100,7 @@ impl TimerDriver {
 
                         w.set_mode(0, Mode::INPUT);
                         w.set_cnf(0, Cnf::PULL_IN__AF_PUSH_PULL_OUT);
-                    })
+                    });
                 });
                 pac::GPIOD.cfglr().modify(|w| {
                     w.set_mode(2, Mode::OUTPUT_50MHZ);
@@ -240,7 +240,7 @@ impl TimerDriver {
 
                         w.set_mode(0, Mode::OUTPUT_50MHZ);
                         w.set_cnf(0, Cnf::ANALOG_IN__PUSH_PULL_OUT);
-                    })
+                    });
                 });
                 pac::GPIOD.cfglr().modify(|w| {
                     w.set_mode(0, Mode::OUTPUT_50MHZ);

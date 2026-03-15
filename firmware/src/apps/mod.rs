@@ -9,6 +9,7 @@ pub enum Main {
 }
 
 impl Main {
+    #[must_use]
     pub fn new() -> Self {
         Self::Animations(animations::Task::new())
     }
