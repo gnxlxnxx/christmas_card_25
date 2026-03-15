@@ -264,7 +264,11 @@ impl Task {
 
                 false
             }
-            TaskState::Score(timer) => timer.expired(),
+            TaskState::Score(timer) => {
+                Buttons::discard_events();
+
+                timer.expired()
+            }
         }
     }
 }

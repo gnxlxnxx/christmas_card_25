@@ -25,7 +25,7 @@ const BITQUARTETS: [u16; 16] = [
 ];
 
 // I have 2 leading and one trailing led full of '0's
-static mut SPI_DMA_BUF: [[u16; 6]; LEDS + 3] = [[0u16; 6]; LEDS + 3];
+static mut SPI_DMA_BUF: [[u16; 6]; LEDS + 3] = [[0; 6]; LEDS + 3];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct Color([u8; 3]);

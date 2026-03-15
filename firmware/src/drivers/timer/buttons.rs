@@ -155,4 +155,8 @@ impl Buttons {
             Poll::Pending
         }
     }
+
+    pub fn discard_events() {
+        let _ = Self::event();
+    }
 }

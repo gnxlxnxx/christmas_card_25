@@ -52,18 +52,6 @@ const GAMMA_LUT: [[u8; 3]; 128] = [
     [240, 242, 0xec], [245, 247, 0x30], [249, 251, 0x96], [253, 255, 0xfc],
 ];
 
-// const PINS: [(pac::gpio::Gpio, usize); ROWS] = [
-//         (pac::GPIOD, 0),
-//         (pac::GPIOA, 2),
-//         (pac::GPIOA, 1),
-//         (pac::GPIOD, 6),
-//         (pac::GPIOD, 5),
-//         (pac::GPIOD, 2),
-//         (pac::GPIOC, 7),
-//         (pac::GPIOC, 4),
-//         (pac::GPIOC, 1),
-// ];
-
 const PINS: [(u8, u8); ROWS] = [
     (3, 0),
     (0, 2),
