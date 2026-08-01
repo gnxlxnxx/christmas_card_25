@@ -6,3 +6,4 @@ runner = "wlink -v flash --enable-sdi-print --watch-serial"
 
 [unstable]
 build-std = ["core"]
+json-target-spec = true

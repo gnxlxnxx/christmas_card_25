@@ -1,6 +1,5 @@
 #![no_std]
 #![no_main]
-#![feature(type_alias_impl_trait)]
 #![allow(clippy::new_without_default, clippy::missing_safety_doc)]
 
 pub mod apps;
