@@ -69,6 +69,9 @@ impl ScoreFlasher {
                     });
                     while FLASH.statr().read().bsy() {}
                     for i in 0..16 {
+                        // SAFETY: Probably unsound usage of write_volatile, as dst points to
+                        // memory outside of all Rust allocations but writing to that memory
+                        // causes memory inside a Rust allocation (HIGH_SCORES) to change.
                         unsafe {
                             HIGH_SCORES_PTR
                                 .cast::<u32>()
